@@ -16,7 +16,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "gen:rpc": "node scripts/gen-rpc-wrappers.mjs && prettier --write src/lib/rpc/functions.ts"
+    "gen:rpc": "node scripts/gen-rpc-wrappers.mjs && prettier --write src/lib/rpc/functions.ts",
+    "check:bundle": "node scripts/check-bundle.mjs dist"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
