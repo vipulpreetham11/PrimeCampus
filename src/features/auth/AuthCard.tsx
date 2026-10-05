@@ -16,7 +16,9 @@ export function AuthCard({
         <p className="mb-4 text-center text-lg font-semibold tracking-tight">PrimeCampus</p>
         <Card>
           <CardHeader>
-            <CardTitle className="text-xl">{title}</CardTitle>
+            <CardTitle>
+              <h1 className="text-xl">{title}</h1>
+            </CardTitle>
             {description && <CardDescription>{description}</CardDescription>}
           </CardHeader>
           <CardContent>{children}</CardContent>

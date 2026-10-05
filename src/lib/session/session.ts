@@ -166,7 +166,8 @@ export async function signIn(rawUsername: string, password: string): Promise<voi
   // Same message for malformed, unknown and wrong-password cases: never reveal whether a user exists.
   if (!username || !password) throw new AppError('VALIDATION_ERROR', GENERIC_SIGN_IN_ERROR, requestId);
 
-  clearClientState();
+  // Drop any leftovers without bumping the UI epoch (that would remount this form and lose its error).
+  queryClient.clear();
   const { error } = await supabase.auth.signInWithPassword({ email: aliasEmail(username), password });
   if (error) {
     if (error.status === 429) {

@@ -13,3 +13,4 @@ tests/e2e/.auth
 node_modules/.tmp
 *.tsbuildinfo
 .DS_Store
+dist-e2e
