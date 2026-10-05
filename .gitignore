@@ -1,0 +1,15 @@
+node_modules
+dist
+*.local
+.env
+.env.*
+!.env.example
+.wrangler
+coverage
+test-results
+playwright-report
+playwright/.cache
+tests/e2e/.auth
+node_modules/.tmp
+*.tsbuildinfo
+.DS_Store
