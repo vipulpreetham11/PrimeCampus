@@ -31,7 +31,11 @@ export default tseslint.config(
     rules: {
       'no-restricted-imports': [
         'error',
-        { paths: [{ name: '@/lib/supabase', message: 'Use a hook in src/features/* that calls src/lib/rpc.' }] },
+        {
+          paths: [
+            { name: '@/lib/supabase', message: 'Use a hook in src/features/* that calls src/lib/rpc.' },
+          ],
+        },
       ],
     },
   },

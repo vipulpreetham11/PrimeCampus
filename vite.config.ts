@@ -7,7 +7,8 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: { alias: { '@': path.resolve(import.meta.dirname, './src') } },
-  build: { sourcemap: false, target: 'es2022' },
+  // TRD §19 budget is ≤300 KB *compressed* initial JS; Vite's warning measures raw size.
+  build: { sourcemap: false, target: 'es2022', chunkSizeWarningLimit: 900 },
   test: {
     environment: 'jsdom',
     globals: true,

@@ -1,4 +1,13 @@
-export const ROLES = ['operator', 'owner', 'admin', 'principal', 'accountant', 'teacher', 'parent', 'student'] as const;
+export const ROLES = [
+  'operator',
+  'owner',
+  'admin',
+  'principal',
+  'accountant',
+  'teacher',
+  'parent',
+  'student',
+] as const;
 export type Role = (typeof ROLES)[number];
 
 export const ROLE_LABELS: Record<Role, string> = {

@@ -11,7 +11,16 @@ export interface ContextScope {
 export type ScopedKey = readonly ['ctx', string, number, string, string, string | null, ...unknown[]];
 
 export function scopedKey(scope: ContextScope, feature: string, ...params: unknown[]): ScopedKey {
-  return ['ctx', scope.accountId, scope.revision, scope.schoolId, scope.role, scope.studentId, feature, ...params];
+  return [
+    'ctx',
+    scope.accountId,
+    scope.revision,
+    scope.schoolId,
+    scope.role,
+    scope.studentId,
+    feature,
+    ...params,
+  ];
 }
 
 /** Keys for account-level (no school context) queries, e.g. the Operator's school list. */

@@ -40,7 +40,9 @@ export interface AccountsActions {
 }
 
 export type AccountsAction = keyof AccountsActions;
-export type AccountsResponse<A extends AccountsAction> = AccountsActions[A]['response'] & { request_id: string };
+export type AccountsResponse<A extends AccountsAction> = AccountsActions[A]['response'] & {
+  request_id: string;
+};
 
 interface EdgeErrorBody {
   ok?: false;
@@ -65,7 +67,8 @@ export async function invokeAccounts<A extends AccountsAction>(
       const requestId = payload.request_id ?? fallbackId;
       appError = toAppError({ message: payload.message }, requestId, payload.code);
       // Edge-only config failures are not user-actionable.
-      if (payload.code === 'CONFIG_ERROR') appError = new AppError('UNKNOWN', 'Something went wrong.', requestId);
+      if (payload.code === 'CONFIG_ERROR')
+        appError = new AppError('UNKNOWN', 'Something went wrong.', requestId);
     } else {
       appError = toAppError(error, fallbackId);
     }

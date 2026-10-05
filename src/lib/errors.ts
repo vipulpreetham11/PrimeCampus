@@ -117,7 +117,10 @@ export function toAppError(err: unknown, requestId: string = newRequestId(), ser
 type Handler = (error: AppError) => void;
 const handlers: Partial<Record<'UNAUTHENTICATED' | 'STALE_CONTEXT', Handler>> = {};
 
-export function setGlobalErrorHandler(code: 'UNAUTHENTICATED' | 'STALE_CONTEXT', handler: Handler | undefined) {
+export function setGlobalErrorHandler(
+  code: 'UNAUTHENTICATED' | 'STALE_CONTEXT',
+  handler: Handler | undefined,
+) {
   handlers[code] = handler;
 }
 

@@ -6,6 +6,9 @@ function required(name: string, value: string | undefined): string {
 
 export const env = {
   supabaseUrl: required('VITE_SUPABASE_URL', import.meta.env.VITE_SUPABASE_URL),
-  supabasePublishableKey: required('VITE_SUPABASE_PUBLISHABLE_KEY', import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY),
+  supabasePublishableKey: required(
+    'VITE_SUPABASE_PUBLISHABLE_KEY',
+    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+  ),
   loginEmailDomain: required('VITE_LOGIN_EMAIL_DOMAIN', import.meta.env.VITE_LOGIN_EMAIL_DOMAIN),
 } as const;

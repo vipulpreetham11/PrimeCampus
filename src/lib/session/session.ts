@@ -74,7 +74,9 @@ export function automaticChoice(contexts: AvailableContext[], isOperator: boolea
   const only = contexts[0]!;
   if (only.role === 'parent') {
     const children = only.children ?? [];
-    return children.length === 1 ? { membershipId: only.membership_id, studentId: children[0]!.student_id } : null;
+    return children.length === 1
+      ? { membershipId: only.membership_id, studentId: children[0]!.student_id }
+      : null;
   }
   return { membershipId: only.membership_id };
 }
@@ -168,7 +170,11 @@ export async function signIn(rawUsername: string, password: string): Promise<voi
   const { error } = await supabase.auth.signInWithPassword({ email: aliasEmail(username), password });
   if (error) {
     if (error.status === 429) {
-      throw new AppError('LIMIT_REACHED', 'Too many sign-in attempts. Wait a few minutes and try again.', requestId);
+      throw new AppError(
+        'LIMIT_REACHED',
+        'Too many sign-in attempts. Wait a few minutes and try again.',
+        requestId,
+      );
     }
     const mapped = toAppError(error, requestId);
     if (mapped.code === 'NETWORK') throw mapped;
@@ -195,7 +201,10 @@ export async function chooseContext(choice: Choice): Promise<void> {
   const args =
     'operatorSchoolId' in choice
       ? { p_operator_school_id: choice.operatorSchoolId }
-      : { p_membership_id: choice.membershipId, ...(choice.studentId ? { p_student_id: choice.studentId } : {}) };
+      : {
+          p_membership_id: choice.membershipId,
+          ...(choice.studentId ? { p_student_id: choice.studentId } : {}),
+        };
   await selectContext(args, { detached: true });
   const context = await getContext({ detached: true, silent: true });
   sessionStore.set({ status: 'ready', context });
@@ -270,7 +279,10 @@ export async function changePassword(currentPassword: string, newPassword: strin
   } catch (e) {
     const err = toAppError(e);
     if (err.code !== 'UNAUTHENTICATED' || !username) throw err;
-    const { error } = await supabase.auth.signInWithPassword({ email: aliasEmail(username), password: newPassword });
+    const { error } = await supabase.auth.signInWithPassword({
+      email: aliasEmail(username),
+      password: newPassword,
+    });
     if (error) {
       await localSignOut('Your password was changed. Please sign in with the new password.');
       return;

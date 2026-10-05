@@ -34,7 +34,12 @@ function pad(n: number, width = 2): string {
 
 /** The calendar date at `instant` in the school's zone. */
 export function schoolDateOf(instant: Date, timeZone: string = SCHOOL_TIME_ZONE): IsoDate {
-  const fmt = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' });
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
   const p = Object.fromEntries(fmt.formatToParts(instant).map((x) => [x.type, x.value]));
   return `${p.year}-${p.month}-${p.day}`;
 }
@@ -63,7 +68,12 @@ export function monthStart(iso: IsoDate): IsoDate {
   return `${pad(y, 4)}-${pad(m)}-01`;
 }
 
-const DISPLAY = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+const DISPLAY = new Intl.DateTimeFormat('en-IN', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  timeZone: 'UTC',
+});
 const DISPLAY_LONG = new Intl.DateTimeFormat('en-IN', {
   weekday: 'long',
   day: 'numeric',
