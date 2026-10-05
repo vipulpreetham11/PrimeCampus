@@ -125,6 +125,7 @@ test('2. demo.admin signs in with the temp password, is forced to change it, lan
   await expect(summary).toContainText('Demo School');
   await expect(summary).toContainText('Admin');
   await expect(page.getByText('Coming in module M4')).toBeVisible();
+  await expect(page.getByText('Password changed.')).toBeHidden({ timeout: 10_000 }); // toast clears
   await page.screenshot({ path: `${SCREENS}/375-admin-shell.png`, fullPage: true });
 
   // Old temp password no longer works; reload keeps the session and the context.
@@ -164,6 +165,8 @@ test('4. Logout in tab A logs out tab B', async ({ browser }) => {
   await tabB.goto('/dashboard');
   await expect(tabB.getByTestId('dashboard-operator')).toBeVisible();
 
+  // B was opened last and is in front; background tabs throttle animation frames.
+  await tabA.bringToFront();
   await tabA.getByTestId('user-menu').click();
   await tabA.getByRole('menuitem', { name: 'Sign out' }).click();
   await expect(tabA).toHaveURL(/\/sign-in$/);

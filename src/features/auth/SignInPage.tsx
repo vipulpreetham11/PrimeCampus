@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { signIn } from '@/lib/session/session';
-import { useSession } from '@/lib/session/store';
+import { sessionStore, useSession } from '@/lib/session/store';
+import { homeFor } from '@/app/gate';
 import { AuthCard } from './AuthCard';
 
 const schema = z.object({
@@ -30,7 +31,7 @@ export function SignInPage() {
     setError(null);
     try {
       await signIn(values.username, values.password);
-      navigate('/dashboard', { replace: true });
+      navigate(homeFor(sessionStore.get().status), { replace: true });
     } catch (e) {
       setError(e);
       form.resetField('password');

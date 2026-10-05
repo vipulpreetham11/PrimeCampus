@@ -15,10 +15,14 @@ export function RootLayout() {
     if (signedIn) trackPageView(location.pathname);
   }, [signedIn, location.pathname]);
 
-  // Context/sign-out notices: a toast plus (in the shell) a persistent banner. Text, not just color.
+  // Notices are shown once, where they can't cover the context header: the shell has a persistent
+  // banner (ready) and the sign-in page shows sign-out notices. Only the chooser needs a toast.
+  const { notice, status } = session;
   useEffect(() => {
-    if (session.notice) toast.info(session.notice.message, { id: `notice-${session.notice.id}` });
-  }, [session.notice]);
+    if (notice?.kind === 'context_changed' && status === 'choosing') {
+      toast.info(notice.message, { id: `notice-${notice.id}` });
+    }
+  }, [notice, status]);
 
   if (session.status === 'loading') {
     return (

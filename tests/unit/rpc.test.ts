@@ -97,6 +97,33 @@ describe('error and response handling', () => {
     expect(err).toMatchObject({ code: 'CONFLICT' });
   });
 
+  it('op_create_school: a bad organization code (migration 1700) surfaces as VALIDATION_ERROR with the server text', async () => {
+    const serverMessage =
+      'Check the organization details (code: 2–40 lowercase letters, digits or dashes; name required)';
+    onRpc(() => ({
+      error: { code: 'P0001', hint: 'VALIDATION_ERROR', message: serverMessage, details: '' },
+    }));
+    const err = await rpc
+      .opCreateSchool({
+        p_organization: { name: 'Demo Org', code: 'Bad Code!' },
+        p_school: { name: 'X', code: 'x1' },
+      })
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(AppError);
+    expect(err).toMatchObject({ code: 'VALIDATION_ERROR', message: serverMessage });
+    expect(rpcCalls[0]?.args).not.toHaveProperty('p_ctx_rev');
+  });
+
+  it('op_create_school: an existing school code surfaces as DUPLICATE', async () => {
+    onRpc(() => ({ error: { code: 'P0001', hint: 'DUPLICATE', message: 'School code already exists' } }));
+    await expect(
+      rpc.opCreateSchool({
+        p_organization: { name: 'Demo', code: 'demo' },
+        p_school: { name: 'Demo School', code: 'demo' },
+      }),
+    ).rejects.toMatchObject({ code: 'DUPLICATE', message: 'School code already exists' });
+  });
+
   it('validates responses of RPCs with a contract schema', async () => {
     onRpc(() => ({ data: { school_id: 'not-a-uuid' } }));
     await expect(rpc.getContext()).rejects.toMatchObject({ code: 'UNKNOWN' });

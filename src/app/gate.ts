@@ -20,3 +20,17 @@ export function redirectFor(status: SessionStatus, pathname: string, isOperator:
       return pathname === '/sign-in' ? '/dashboard' : null;
   }
 }
+
+/** The screen a user belongs on right after an action (sign-in, password change) — agrees with the gate. */
+export function homeFor(status: SessionStatus): string {
+  switch (status) {
+    case 'ready':
+      return '/dashboard';
+    case 'choosing':
+      return '/choose';
+    case 'must_change_password':
+      return '/change-password';
+    default:
+      return '/sign-in';
+  }
+}

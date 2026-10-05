@@ -17,7 +17,8 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { changePassword, logout } from '@/lib/session/session';
-import { useSession } from '@/lib/session/store';
+import { sessionStore, useSession } from '@/lib/session/store';
+import { homeFor } from '@/app/gate';
 import { AuthCard } from './AuthCard';
 
 // Same bounds as the `accounts` Edge Function (8–72 chars, must differ from current).
@@ -47,7 +48,7 @@ export function ChangePasswordPage() {
       await changePassword(values.current, values.next);
       form.reset();
       toast.success('Password changed.');
-      navigate('/dashboard', { replace: true });
+      navigate(homeFor(sessionStore.get().status), { replace: true });
     } catch (e) {
       setError(e);
     }
