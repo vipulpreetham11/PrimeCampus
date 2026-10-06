@@ -1,0 +1,13 @@
+// Cloudflare Workers static assets (TRD §20). Deploys ONLY the Vite `dist` output — no Worker script.
+// SPA fallback: navigation requests to unknown paths get index.html so nested routes survive a reload;
+// missing /assets/*.js|css requests still return 404 instead of HTML.
+// Not deployed in M0. Deploy later with `npx wrangler deploy` after `npm run build`.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "primecampus",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application",
+  },
+}
