@@ -1,0 +1,118 @@
+# M1 — Setup & People (prompt to paste into Claude Code)
+
+Read `CLAUDE.md` fully, then `docs/reports/M0.md`, PRD sections on school setup, calendar, people, admissions and user
+management, and these migrations: `…0200_school_setup`, `…0300_people`, `…0400_admissions_imports_timetable` (admissions
+part only), `…1000_rpc_academic` (setup/calendar/teaching assignments), `…1200_rpc_admissions_salary_operator`
+(admissions part), `…1300_rpc_setup_master_reads`, `…1500_edge_service_wrappers`, `…1800_m1_reads_and_memberships`,
+and `supabase/functions/accounts/index.ts`.
+
+You are building **Module M1: Setup & People** on branch `module/m1-setup-people` (branch from `main`, which has M0).
+Quality beats speed. Read each RPC's body before calling it: argument names, JSON shapes, error messages and the
+capability it checks are all in the SQL. **No backend changes in this module** — if an RPC is missing or wrong, stop
+and report it; do not write a migration.
+
+## Out of scope (do not build)
+CSV/Excel imports (comes as M1b with its own backend) · opening fee balances (M3) · timetable, lesson sessions,
+attendance, diary, homework (M2) · fees (M3) · salary, reports, operator audit screens (M4).
+
+## Engineering rules for this module
+- **shadcn on React 18**: every primitive that wraps a DOM element or Radix part must use `React.forwardRef`
+  (M0 already fixed this for existing ones — keep it that way for every new primitive you add). Check the console for
+  "Function components cannot be given refs" warnings in tests.
+- One `src/features/<area>/` folder per area below; hooks own the queries/mutations; pages stay thin.
+- Query keys always include the context revision. After a mutation, invalidate only the affected keys.
+- Every edit form passes `p_expected_version`; every `CONFLICT` reloads the record and tells the user.
+- Every screen handles loading / empty / error (with request id) / forbidden / offline via `DataState`.
+- Navigation and buttons are shown from `capabilities`, never from role names.
+- Lists that can grow (students, leads) use the server's keyset paging arguments; never fetch everything.
+
+## Build
+
+### 1. School setup (`src/features/setup/`) — capability `setup.manage` (read for others where the RPC allows)
+Source of truth for reads: `get_setup_snapshot(p_academic_year_id)`.
+1. **School profile**: `save_school_profile` (version-checked). Show UDISE, board, contact, address fields that exist.
+2. **Academic years**: list, create/edit (`save_academic_year`), mark current (`set_current_year` with a confirm dialog
+   explaining it changes defaults for everyone). Year selector in setup pages defaults to the current year.
+3. **Classes / sections / subjects**: `save_class`, `save_section` (per year, capacity), `save_subject`;
+   retire via `status`, never delete. **Class subjects**: `list_class_subjects` + `save_class_subjects` (full replace
+   per class; show optional flag and order).
+4. **Bell schedules** (`save_period_schedule`): editor for day start/end and ordered slots (period / break / assembly
+   etc. — use the kinds the SQL accepts). Offer two presets that prefill the form only (e.g. "8 periods + lunch",
+   "Half day — 4 periods"); user can edit before saving. Validate no overlaps client-side, but trust server errors.
+   Show which schedule is effective from which date.
+5. **Attendance mode** (`set_attendance_mode`): daily vs per-period with an effective-from date and a plain-English
+   explanation of the difference. Show today's mode from the snapshot.
+6. **Calendars** (`get_calendar`, `save_calendar_pattern`, `save_calendar_range`): month grid per audience
+   (Students / Staff, and Staff by staff group). Show resolved day type with text + colour (color never the only
+   signal), overrides marked, totals (working days, half days, holidays). Weekly pattern editor; range editor for
+   holidays / half days / exam days with label + reason and optional weekdays filter. Phone view = list, not grid.
+
+### 2. Staff (`src/features/staff/`)
+1. **Staff groups**: `list_staff_groups`, `save_staff_group`. The default salary field is visible/editable **only**
+   when the user has `staff_finance.read` (edit needs `staff_finance.manage`); Principal must not see salary.
+2. **Staff directory**: `list_staff` (filter by group, include inactive toggle), create/edit `save_staff`.
+3. **Staff confidential/finance** (`staff_finance.read` / `staff_finance.manage` only): `get_staff_confidential`, `save_staff_finance`
+   (salary in paise via `MoneyInput`, effective-from, reason, bank details). Never render these fields for others,
+   and never put them in a shared query key with the non-confidential profile.
+4. **Teaching assignments**: `list_teaching_assignments` (by section or by staff, "active on" date),
+   `save_teaching_assignment` (class teacher / subject teacher — kinds from SQL), `end_teaching_assignment`.
+   Section page shows class teacher + subject teachers; staff page shows what they teach.
+
+### 3. Users & logins (`src/features/users/`) — capability `users.manage`
+1. **Users list**: `list_school_users` — name, username, roles here (with status), linked staff/guardian/student,
+   must-change-password, last seen.
+2. **Create login**: Edge `accounts` → `provision` (username, display name, memberships, links). One operation id per
+   dialog. Temp password via `OneTimeSecretDialog` only.
+3. **Add a role to an existing person**: `find_school_account(username)` → if found, show who it is and their roles
+   here → `grant_membership(role, admissions_duty)`. If `null`, say "No login with that username in your organization"
+   (do not suggest it exists elsewhere).
+4. **Admissions duty toggle**: `set_admissions_duty` (version-checked).
+5. **Disable a role**: `disable_membership` with reason + confirm; explain the person is signed out of that role.
+   Server blocks disabling yourself — show its message.
+6. **Reset password** (Edge `reset_password`, one-time dialog) and **disable/enable login** (Edge `set_status`).
+7. **Link/unlink login to a record**: `link_account(kind, record_id, account_id|null)` from the staff, guardian and
+   student pages. Show the server's message when the role is missing.
+
+### 4. Students & guardians (`src/features/students/`)
+1. **Directory**: `list_students` with search (name / admission no), class and section filters, keyset paging
+   ("Load more"), 375px card layout.
+2. **Profile**: `get_student_profile` — personal, placement history, guardians, linked login. Edit with
+   `update_student` (version-checked). UDISE+ profile fields that the SQL accepts are grouped in sections.
+3. **Sensitive fields**: `save_student_sensitive` — separate card, only shown with `students.sensitive`; never logged or included in telemetry.
+4. **Guardians**: `search_guardians` (≥3 chars or phone) to find an existing parent before creating a new one
+   (siblings share guardians); `save_guardian` to create/edit and link to a student with relationship, primary flag
+   and portal access.
+5. **Placement moves**: `move_placements` — select students, target section, effective date, reason →
+   **preview first** (`p_preview=true`), show the server's preview, then commit with the same operation id.
+
+### 5. Admissions (`src/features/admissions/`) — capability `admissions.manage`
+1. **Enquiries list**: `list_leads` (stage filter, search, keyset paging). **Follow-ups due** widget
+   (`get_followups_due`).
+2. **Enquiry detail**: `get_lead` (followups timeline, other enquiries with the same phone), edit `save_lead`
+   (version-checked), log a follow-up `record_lead_followup` (channel, outcome, note, next date, stage change, lost reason).
+3. **Admit**: `admit_student` from an enquiry or blank — student details, guardians (pick existing via
+   `search_guardians` or new), section, joined-on, roll no, optional sensitive block. One operation id per form.
+   On success go to the new student's profile.
+
+## Demo data (Demo School only, usernames `demo.*`)
+`npm run seed:demo` (from M0V) already creates year 2026-27, Class 1 A, Class 2 A, three students, two guardians,
+one staff record and the logins `demo.parent` and `demo.teachparent`. Keep that script working and don't rename those
+records. Everything M1 adds is created **through the UI you build** (not SQL, not the seed script): classes 3, sections
+B, 5 subjects, one bell schedule, calendar with a weekly off + one holiday range, 2 more staff, login `demo.teacher`,
+3 more students, 3 enquiries (one converted via Admit). Playwright tests that create records use unique names
+(e.g. a run suffix) so they can run repeatedly.
+
+## Done when (verify each and record how in `docs/reports/M1.md`)
+- [ ] `npm run typecheck`, `lint`, `test`, `build`, `check:bundle` all pass; no `.from(` anywhere; no browser storage.
+- [ ] Unit/component tests: bell-schedule editor validation + presets, calendar month rendering of each day type,
+      money input for salary, placement-move preview→commit uses one operation id, CONFLICT reload path on one edit form,
+      users screen hides finance/confidential UI without the capability.
+- [ ] Playwright (live, Demo School, creds from env): (1) admin sets up year/class/section/subject/bell schedule;
+      (2) creates staff + teaching assignment; (3) provisions `demo.teacher`, temp password shown once, teacher must
+      change password; (4) enquiry → follow-up → admit → profile shows guardian; (5) `find_school_account` + grant
+      second role; (6) the M0V specs still pass unchanged; (7) Principal (or a role without finance) cannot see salary fields.
+- [ ] Two-tab check: editing the same student in two tabs gives CONFLICT on the second save and reloads.
+- [ ] 375px screenshots: student directory, student profile, calendar (list view), enquiry detail, users list.
+- [ ] Report lists every RPC used, any PRD/DB mismatch found, and anything not verified.
+
+Stop when M1 is done. Do not start M2.
