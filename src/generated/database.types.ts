@@ -115,6 +115,10 @@ export type Database = {
         Args: { p_as_of: string; p_ctx_rev: number }
         Returns: Json
       }
+      find_school_account: {
+        Args: { p_ctx_rev: number; p_username: string }
+        Returns: Json
+      }
       generate_lesson_sessions: {
         Args: {
           p_ctx_rev: number
@@ -126,6 +130,17 @@ export type Database = {
       }
       get_attendance_overview: {
         Args: { p_ctx_rev: number; p_date: string }
+        Returns: Json
+      }
+      get_calendar: {
+        Args: {
+          p_academic_year_id: string
+          p_audience: string
+          p_ctx_rev: number
+          p_from?: string
+          p_staff_group_id?: string
+          p_to?: string
+        }
         Returns: Json
       }
       get_collection_report: {
@@ -158,6 +173,10 @@ export type Database = {
       }
       get_homework_roster: {
         Args: { p_assignment_id: string; p_ctx_rev: number }
+        Returns: Json
+      }
+      get_lead: {
+        Args: { p_ctx_rev: number; p_lead_id: string }
         Returns: Json
       }
       get_marking_roster: {
@@ -227,6 +246,15 @@ export type Database = {
         }
         Returns: Json
       }
+      grant_membership: {
+        Args: {
+          p_account_id: string
+          p_admissions_duty?: boolean
+          p_ctx_rev: number
+          p_role: string
+        }
+        Returns: Json
+      }
       issue_opening_balance: {
         Args: {
           p_academic_year_id: string
@@ -250,6 +278,23 @@ export type Database = {
         }
         Returns: Json
       }
+      link_account: {
+        Args: {
+          p_account_id?: string
+          p_ctx_rev: number
+          p_kind: string
+          p_record_id: string
+        }
+        Returns: Json
+      }
+      list_class_subjects: {
+        Args: {
+          p_academic_year_id: string
+          p_class_id?: string
+          p_ctx_rev: number
+        }
+        Returns: Json
+      }
       list_leads: {
         Args: {
           p_before_created_at?: string
@@ -260,12 +305,17 @@ export type Database = {
         }
         Returns: Json
       }
+      list_school_users: { Args: { p_ctx_rev: number }; Returns: Json }
       list_staff: {
         Args: {
           p_ctx_rev: number
           p_include_inactive?: boolean
           p_staff_group_id?: string
         }
+        Returns: Json
+      }
+      list_staff_groups: {
+        Args: { p_ctx_rev: number; p_include_retired?: boolean }
         Returns: Json
       }
       list_students: {
@@ -277,6 +327,16 @@ export type Database = {
           p_limit?: number
           p_search?: string
           p_section_id?: string
+        }
+        Returns: Json
+      }
+      list_teaching_assignments: {
+        Args: {
+          p_academic_year_id?: string
+          p_active_on?: string
+          p_ctx_rev: number
+          p_section_id?: string
+          p_staff_id?: string
         }
         Returns: Json
       }
@@ -741,11 +801,24 @@ export type Database = {
         }
         Returns: Json
       }
+      search_guardians: {
+        Args: { p_ctx_rev: number; p_query: string }
+        Returns: Json
+      }
       select_context: {
         Args: {
           p_membership_id?: string
           p_operator_school_id?: string
           p_student_id?: string
+        }
+        Returns: Json
+      }
+      set_admissions_duty: {
+        Args: {
+          p_ctx_rev: number
+          p_expected_version?: number
+          p_membership_id: string
+          p_on: boolean
         }
         Returns: Json
       }
