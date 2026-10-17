@@ -4,7 +4,7 @@
 //   provision        Admin/Operator creates a login + school roles; returns a one-time temporary password
 //   reset_password   Admin (of every school the target belongs to) or Operator; returns a temporary password
 //   change_password  Signed-in user changes own password (works while must_change_password is set)
-//   set_status       Operator enables/disables an account globally
+//   set_status       Operator, or Admin of every school the target belongs to, enables/disables a login
 //
 // Login model: school-issued username -> internal alias `<username>@<LOGIN_EMAIL_DOMAIN>`.
 // The alias is an identifier, not a mailbox. No email is ever sent.
@@ -212,9 +212,11 @@ async function setStatus(c: Caller, body: Record<string, unknown>) {
   const { account_id, active } = body as { account_id: string; active: boolean };
   if (!isUuid(account_id) || typeof active !== "boolean") throw new AppError("VALIDATION_ERROR", "account_id and active are required");
   if (account_id === c.uid) throw new AppError("VALIDATION_ERROR", "You cannot change your own status");
-  const me = await rpc<Requester>("svc_requester", { p_uid: c.uid, p_auth_session_id: c.sid, p_allow_must_change: false });
-  if (!me.is_operator) {
-    throw new AppError("FORBIDDEN", "Only an Operator can disable an account globally. Admins disable a school role instead.", 403);
+  await rpc<Requester>("svc_requester", { p_uid: c.uid, p_auth_session_id: c.sid, p_allow_must_change: false });
+  // Same rule as reset_password: Operator, or Admin of EVERY school the target belongs to (and target is not an Operator).
+  const allowed = await rpc<boolean>("svc_can_manage_account", { p_requester: c.uid, p_target: account_id });
+  if (!allowed) {
+    throw new AppError("FORBIDDEN", "This login is also used in a school you don't manage. Disable their role here instead, or ask the Operator.", 403);
   }
   const { error } = await admin.auth.admin.updateUserById(account_id, { ban_duration: active ? "none" : "876000h" });
   if (error) throw new AppError("TEMPORARILY_UNAVAILABLE", "Could not update the login. Retry.", 503);
