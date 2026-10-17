@@ -111,6 +111,20 @@ export const router = createBrowserRouter([
               import('@/features/staff/StaffProfilePage').then((m) => ({ Component: m.StaffProfilePage })),
           },
           {
+            path: '/students',
+            lazy: () =>
+              import('@/features/students/StudentDirectoryPage').then((m) => ({
+                Component: m.StudentDirectoryPage,
+              })),
+          },
+          {
+            path: '/students/:studentId',
+            lazy: () =>
+              import('@/features/students/StudentProfilePage').then((m) => ({
+                Component: m.StudentProfilePage,
+              })),
+          },
+          {
             path: '/users',
             lazy: () => import('@/features/users/UsersPage').then((m) => ({ Component: m.UsersPage })),
           },
