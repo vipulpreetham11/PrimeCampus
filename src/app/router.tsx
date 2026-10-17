@@ -81,6 +81,36 @@ export const router = createBrowserRouter([
             ],
           },
           {
+            path: '/staff',
+            lazy: () => import('@/features/staff/StaffLayout').then((m) => ({ Component: m.StaffLayout })),
+            children: [
+              {
+                index: true,
+                lazy: () =>
+                  import('@/features/staff/StaffDirectoryPage').then((m) => ({
+                    Component: m.StaffDirectoryPage,
+                  })),
+              },
+              {
+                path: 'groups',
+                lazy: () =>
+                  import('@/features/staff/StaffGroupsPage').then((m) => ({ Component: m.StaffGroupsPage })),
+              },
+              {
+                path: 'teaching',
+                lazy: () =>
+                  import('@/features/staff/TeachingBySectionPage').then((m) => ({
+                    Component: m.TeachingBySectionPage,
+                  })),
+              },
+            ],
+          },
+          {
+            path: '/staff/:staffId',
+            lazy: () =>
+              import('@/features/staff/StaffProfilePage').then((m) => ({ Component: m.StaffProfilePage })),
+          },
+          {
             path: '/operator/onboarding',
             lazy: () =>
               import('@/features/operator/OnboardingPage').then((m) => ({

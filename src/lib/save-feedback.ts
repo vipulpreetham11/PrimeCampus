@@ -29,13 +29,11 @@ export function blankToNull(v: string | null | undefined): string | null {
  * Keys of `next` whose value differs from `original` (null/'' treated alike). Lets edit forms send
  * only what the user changed, so fields the form doesn't show are never overwritten.
  */
-export function changedFields<T extends Record<string, unknown>>(original: Partial<T>, next: T): Partial<T> {
+export function changedFields<T extends object>(original: Partial<T>, next: T): Partial<T> {
   const out: Partial<T> = {};
+  const norm = (v: unknown) => (v === '' || v === undefined ? null : v);
   for (const key of Object.keys(next) as (keyof T)[]) {
-    const a = original[key] ?? null;
-    const b = next[key] ?? null;
-    const norm = (v: unknown) => (v === '' ? null : v);
-    if (JSON.stringify(norm(a)) !== JSON.stringify(norm(b))) out[key] = next[key];
+    if (JSON.stringify(norm(original[key])) !== JSON.stringify(norm(next[key]))) out[key] = next[key];
   }
   return out;
 }
