@@ -171,6 +171,10 @@ export type Database = {
         Args: { p_ctx_rev: number; p_days_ahead?: number }
         Returns: Json
       }
+      get_guardian: {
+        Args: { p_ctx_rev: number; p_guardian_id: string }
+        Returns: Json
+      }
       get_homework_roster: {
         Args: { p_assignment_id: string; p_ctx_rev: number }
         Returns: Json
@@ -197,8 +201,13 @@ export type Database = {
         Args: { p_ctx_rev: number; p_month?: string; p_staff_id?: string }
         Returns: Json
       }
+      get_school_profile: { Args: { p_ctx_rev: number }; Returns: Json }
       get_setup_snapshot: {
         Args: { p_academic_year_id?: string; p_ctx_rev: number }
+        Returns: Json
+      }
+      get_staff: {
+        Args: { p_ctx_rev: number; p_staff_id: string }
         Returns: Json
       }
       get_staff_confidential: {
@@ -298,6 +307,7 @@ export type Database = {
       list_leads: {
         Args: {
           p_before_created_at?: string
+          p_before_id?: string
           p_ctx_rev: number
           p_limit?: number
           p_search?: string

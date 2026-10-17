@@ -44,6 +44,8 @@ export const getDuesReport = (args: SchoolArgs<'get_dues_report'> = {}, options?
   schoolRpc('get_dues_report', args, options);
 export const getFollowupsDue = (args: SchoolArgs<'get_followups_due'> = {}, options?: RpcOptions) =>
   schoolRpc('get_followups_due', args, options);
+export const getGuardian = (args: SchoolArgs<'get_guardian'>, options?: RpcOptions) =>
+  schoolRpc('get_guardian', args, options);
 export const getHomeworkRoster = (args: SchoolArgs<'get_homework_roster'>, options?: RpcOptions) =>
   schoolRpc('get_homework_roster', args, options);
 export const getLead = (args: SchoolArgs<'get_lead'>, options?: RpcOptions) =>
@@ -56,8 +58,12 @@ export const getSalaryCalculations = (
   args: SchoolArgs<'get_salary_calculations'> = {},
   options?: RpcOptions,
 ) => schoolRpc('get_salary_calculations', args, options);
+export const getSchoolProfile = (args: SchoolArgs<'get_school_profile'> = {}, options?: RpcOptions) =>
+  schoolRpc('get_school_profile', args, options);
 export const getSetupSnapshot = (args: SchoolArgs<'get_setup_snapshot'> = {}, options?: RpcOptions) =>
   schoolRpc('get_setup_snapshot', args, options);
+export const getStaff = (args: SchoolArgs<'get_staff'>, options?: RpcOptions) =>
+  schoolRpc('get_staff', args, options);
 export const getStaffConfidential = (args: SchoolArgs<'get_staff_confidential'>, options?: RpcOptions) =>
   schoolRpc('get_staff_confidential', args, options);
 export const getStudentAttendanceSummary = (
@@ -214,7 +220,7 @@ export const updateStudent = (args: SchoolArgs<'update_student'>, options?: RpcO
 export const waiveLateFee = (args: SchoolArgs<'waive_late_fee'>, options?: RpcOptions) =>
   schoolRpc('waive_late_fee', args, options);
 
-/** RPCs that take p_ctx_rev (92). */
+/** RPCs that take p_ctx_rev (95). */
 export const SCHOOL_RPCS = [
   'activate_timetable',
   'add_invoice_adjustment',
@@ -235,12 +241,15 @@ export const SCHOOL_RPCS = [
   'get_date_schedule',
   'get_dues_report',
   'get_followups_due',
+  'get_guardian',
   'get_homework_roster',
   'get_lead',
   'get_marking_roster',
   'get_receipt',
   'get_salary_calculations',
+  'get_school_profile',
   'get_setup_snapshot',
+  'get_staff',
   'get_staff_confidential',
   'get_student_attendance_summary',
   'get_student_homework',
