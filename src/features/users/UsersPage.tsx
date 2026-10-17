@@ -35,6 +35,7 @@ import {
   useSetAdmissionsDuty,
   useSetLoginStatus,
   type IssuedPassword,
+  useRefreshAfterLoginChange,
 } from './hooks';
 
 type Pending =
@@ -78,6 +79,7 @@ function DutySwitch({ m, onError }: { m: Membership; onError: (e: unknown) => vo
 export function UsersPage() {
   const me = useSessionSelector((s) => s.account?.accountId);
   const users = useSchoolUsers();
+  const refresh = useRefreshAfterLoginChange();
   const disableRole = useDisableMembership();
   const setStatus = useSetLoginStatus();
   const [filter, setFilter] = useState('');
@@ -268,6 +270,7 @@ export function UsersPage() {
           setError(null);
           try {
             setIssued(await resetLoginPassword(pending.user.account_id, pending.user.username));
+            refresh(); // "must change password" and last-seen changed
           } catch (e) {
             setError(handleSaveError(e));
           } finally {

@@ -31,6 +31,19 @@ function useInvalidateUsers() {
   };
 }
 
+/**
+ * After the Edge `provision` / `reset_password` calls (plain async, not mutations): refresh the user
+ * list and the records a new login may have been linked to.
+ */
+export function useRefreshAfterLoginChange() {
+  const key = useScopedKey();
+  const qc = useQueryClient();
+  return () => {
+    for (const feature of ['users', 'staff-list', 'staff', 'student', 'guardian', 'guardian-search'])
+      void qc.invalidateQueries({ queryKey: key(feature) });
+  };
+}
+
 export function useFindSchoolAccount() {
   return useMutation({
     // A lookup triggered by a button; not cached (the answer depends on what was typed).

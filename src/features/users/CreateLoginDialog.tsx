@@ -17,7 +17,7 @@ import { useOperationId } from '@/lib/operation';
 import { useSessionSelector } from '@/lib/session/store';
 import { GuardianPicker } from '@/features/students/GuardianPicker';
 import { useStaffList } from '@/features/staff/hooks';
-import { provisionLogin, type IssuedPassword } from './hooks';
+import { provisionLogin, useRefreshAfterLoginChange, type IssuedPassword } from './hooks';
 
 const STAFF_ROLES: readonly string[] = ['owner', 'admin', 'principal', 'accountant', 'teacher'];
 const NO_STAFF = '__none__';
@@ -52,6 +52,7 @@ export function CreateLoginDialog({
 }) {
   const schoolId = useSessionSelector((s) => s.context?.school_id ?? '');
   const { operationId, reset } = useOperationId();
+  const refresh = useRefreshAfterLoginChange();
   const staff = useStaffList(null, false);
   const [guardians, setGuardians] = useState<GuardianSearchItem[]>([]);
   const [busy, setBusy] = useState(false);
@@ -91,6 +92,7 @@ export function CreateLoginDialog({
         links,
       });
       reset();
+      refresh();
       if (issued) {
         form.reset();
         setGuardians([]);
