@@ -95,3 +95,16 @@ export function bootstrapRow(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 }
+
+export function setupSnapshotRow() {
+  return {
+    academic_years: [],
+    selected_year_id: null,
+    classes: [],
+    sections: [],
+    subjects: [],
+    period_schedules: [],
+    attendance_mode_today: 'daily',
+    attendance_modes: [],
+  };
+}

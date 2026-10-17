@@ -35,14 +35,25 @@ describe('toAppError — PostgREST hint mapping (CLAUDE.md rule 3)', () => {
   });
 
   it('never exposes SQL for unknown database errors', () => {
-    const e = toAppError({
-      code: '23505',
-      message: 'duplicate key value violates unique constraint "schools_code_key"',
-    });
+    const e = toAppError({ code: 'XX000', message: 'internal error in relation "app.schools" at line 3' });
     expect(e.code).toBe('UNKNOWN');
     expect(e.message).toBe('Something went wrong.');
-    expect(e.message).not.toMatch(/constraint|duplicate key/);
+    expect(e.message).not.toMatch(/relation|app\.schools/);
     expect(e.requestId).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it.each([
+    ['23505', 'DUPLICATE'],
+    ['23P01', 'VALIDATION_ERROR'],
+    ['23514', 'VALIDATION_ERROR'],
+    ['23502', 'VALIDATION_ERROR'],
+    ['23503', 'VALIDATION_ERROR'],
+    ['22P02', 'VALIDATION_ERROR'],
+  ])('maps raw constraint SQLSTATE %s to %s with a fixed safe message', (sqlState, code) => {
+    const raw = 'duplicate key value violates unique constraint "students_admission_no_uq"';
+    const e = toAppError({ code: sqlState, message: raw, hint: null, details: 'Key (x)=(y)' });
+    expect(e.code).toBe(code);
+    expect(e.message).not.toMatch(/constraint|Key \(|students_/);
   });
 
   it('ignores hints that are not part of the contract', () => {

@@ -69,6 +69,21 @@ function isServerCode(v: unknown): v is ServerErrorCode {
   return typeof v === 'string' && (SERVER_ERROR_CODES as readonly string[]).includes(v);
 }
 
+const CONSTRAINT_MESSAGES: Record<string, [AppErrorCode, string]> = {
+  '23505': [
+    'DUPLICATE',
+    'This already exists (for example the same name, code or number). Use a different value.',
+  ],
+  '23P01': ['VALIDATION_ERROR', 'These dates overlap an existing record. Choose dates that do not overlap.'],
+  '23514': ['VALIDATION_ERROR', 'Some values are not allowed. Check the highlighted rules and try again.'],
+  '23502': ['VALIDATION_ERROR', 'A required value is missing.'],
+  '23503': ['VALIDATION_ERROR', 'This refers to something that does not exist in this school.'],
+  '22P02': ['VALIDATION_ERROR', 'One of the values has the wrong format.'],
+  '22007': ['VALIDATION_ERROR', 'One of the dates or times has the wrong format.'],
+  '22008': ['VALIDATION_ERROR', 'One of the dates or times is out of range.'],
+  '22001': ['VALIDATION_ERROR', 'One of the values is too long.'],
+};
+
 const NETWORK_PATTERN = /failed to fetch|networkerror|network request failed|load failed|fetch failed/i;
 
 interface ErrorLike {
@@ -101,6 +116,12 @@ export function toAppError(err: unknown, requestId: string = newRequestId(), ser
   if (e.code === 'PGRST301' || e.code === 'PGRST302' || /jwt expired|invalid jwt/i.test(message)) {
     return new AppError('UNAUTHENTICATED', SAFE_MESSAGES.UNAUTHENTICATED, requestId);
   }
+
+  // Some invoker RPCs let table constraints raise directly (no hint). Map the SQLSTATE class to a
+  // safe, fixed message; the database text itself is never shown.
+  const sqlState = typeof e.code === 'string' ? e.code : '';
+  const constraintMessage = CONSTRAINT_MESSAGES[sqlState];
+  if (constraintMessage) return new AppError(constraintMessage[0], constraintMessage[1], requestId);
 
   const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
   if (offline || NETWORK_PATTERN.test(message) || e.name === 'FunctionsFetchError') {
