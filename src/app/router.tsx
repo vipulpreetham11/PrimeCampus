@@ -34,6 +34,53 @@ export const router = createBrowserRouter([
               import('@/features/dashboard/DashboardPage').then((m) => ({ Component: m.DashboardPage })),
           },
           {
+            path: '/setup',
+            lazy: () => import('@/features/setup/SetupLayout').then((m) => ({ Component: m.SetupLayout })),
+            children: [
+              { index: true, element: <Navigate to="/setup/profile" replace /> },
+              {
+                path: 'profile',
+                lazy: () =>
+                  import('@/features/setup/SchoolProfilePage').then((m) => ({
+                    Component: m.SchoolProfilePage,
+                  })),
+              },
+              {
+                path: 'years',
+                lazy: () => import('@/features/setup/YearsPage').then((m) => ({ Component: m.YearsPage })),
+              },
+              {
+                path: 'classes',
+                lazy: () =>
+                  import('@/features/setup/ClassesPage').then((m) => ({ Component: m.ClassesPage })),
+              },
+              {
+                path: 'subjects',
+                lazy: () =>
+                  import('@/features/setup/SubjectsPage').then((m) => ({ Component: m.SubjectsPage })),
+              },
+              {
+                path: 'bell-schedules',
+                lazy: () =>
+                  import('@/features/setup/BellSchedulesPage').then((m) => ({
+                    Component: m.BellSchedulesPage,
+                  })),
+              },
+              {
+                path: 'attendance-mode',
+                lazy: () =>
+                  import('@/features/setup/AttendanceModePage').then((m) => ({
+                    Component: m.AttendanceModePage,
+                  })),
+              },
+              {
+                path: 'calendar',
+                lazy: () =>
+                  import('@/features/setup/CalendarPage').then((m) => ({ Component: m.CalendarPage })),
+              },
+            ],
+          },
+          {
             path: '/operator/onboarding',
             lazy: () =>
               import('@/features/operator/OnboardingPage').then((m) => ({
