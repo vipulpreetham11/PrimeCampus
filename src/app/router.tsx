@@ -1,10 +1,143 @@
-import { createBrowserRouter, Navigate } from 'react-router';
+import { createBrowserRouter, Navigate, type RouteObject } from 'react-router';
+import type { Capability } from '@/contracts/capabilities';
 import { RootLayout } from './layouts/RootLayout';
 import { AppShell } from './layouts/AppShell';
+import { RequireCapability } from './RequireCapability';
 import { RouteError } from './RouteError';
 
 // Data router with lazy route modules (TRD §3). Route guards improve navigation only;
 // the server enforces permissions on every RPC.
+
+/** Wrap routes in a capability guard (UX only). */
+function guarded(anyOf: Capability[], children: RouteObject[]): RouteObject {
+  return { element: <RequireCapability anyOf={anyOf} />, children };
+}
+
+const setupRoutes: RouteObject = guarded(
+  ['setup.manage', 'staff.member'],
+  [
+    {
+      path: '/setup',
+      lazy: () => import('@/features/setup/SetupLayout').then((m) => ({ Component: m.SetupLayout })),
+      children: [
+        { index: true, element: <Navigate to="/setup/profile" replace /> },
+        {
+          path: 'profile',
+          lazy: () =>
+            import('@/features/setup/SchoolProfilePage').then((m) => ({ Component: m.SchoolProfilePage })),
+        },
+        {
+          path: 'years',
+          lazy: () => import('@/features/setup/YearsPage').then((m) => ({ Component: m.YearsPage })),
+        },
+        {
+          path: 'classes',
+          lazy: () => import('@/features/setup/ClassesPage').then((m) => ({ Component: m.ClassesPage })),
+        },
+        {
+          path: 'subjects',
+          lazy: () => import('@/features/setup/SubjectsPage').then((m) => ({ Component: m.SubjectsPage })),
+        },
+        {
+          path: 'bell-schedules',
+          lazy: () =>
+            import('@/features/setup/BellSchedulesPage').then((m) => ({ Component: m.BellSchedulesPage })),
+        },
+        {
+          path: 'attendance-mode',
+          lazy: () =>
+            import('@/features/setup/AttendanceModePage').then((m) => ({ Component: m.AttendanceModePage })),
+        },
+        {
+          path: 'calendar',
+          lazy: () => import('@/features/setup/CalendarPage').then((m) => ({ Component: m.CalendarPage })),
+        },
+      ],
+    },
+  ],
+);
+
+const staffRoutes: RouteObject = guarded(
+  ['staff.read'],
+  [
+    {
+      path: '/staff',
+      lazy: () => import('@/features/staff/StaffLayout').then((m) => ({ Component: m.StaffLayout })),
+      children: [
+        {
+          index: true,
+          lazy: () =>
+            import('@/features/staff/StaffDirectoryPage').then((m) => ({ Component: m.StaffDirectoryPage })),
+        },
+        {
+          path: 'groups',
+          lazy: () =>
+            import('@/features/staff/StaffGroupsPage').then((m) => ({ Component: m.StaffGroupsPage })),
+        },
+        {
+          path: 'teaching',
+          lazy: () =>
+            import('@/features/staff/TeachingBySectionPage').then((m) => ({
+              Component: m.TeachingBySectionPage,
+            })),
+        },
+      ],
+    },
+    {
+      path: '/staff/:staffId',
+      lazy: () =>
+        import('@/features/staff/StaffProfilePage').then((m) => ({ Component: m.StaffProfilePage })),
+    },
+  ],
+);
+
+const studentRoutes: RouteObject = guarded(
+  ['students.read_all'],
+  [
+    {
+      path: '/students',
+      lazy: () =>
+        import('@/features/students/StudentDirectoryPage').then((m) => ({
+          Component: m.StudentDirectoryPage,
+        })),
+    },
+    {
+      path: '/students/:studentId',
+      lazy: () =>
+        import('@/features/students/StudentProfilePage').then((m) => ({ Component: m.StudentProfilePage })),
+    },
+  ],
+);
+
+const admissionRoutes: RouteObject = guarded(
+  ['admissions.manage'],
+  [
+    {
+      path: '/admissions',
+      lazy: () => import('@/features/admissions/EnquiriesPage').then((m) => ({ Component: m.EnquiriesPage })),
+    },
+    {
+      path: '/admissions/admit',
+      lazy: () => import('@/features/admissions/AdmitPage').then((m) => ({ Component: m.AdmitPage })),
+    },
+    {
+      path: '/admissions/:leadId',
+      lazy: () =>
+        import('@/features/admissions/LeadDetailPage').then((m) => ({ Component: m.LeadDetailPage })),
+    },
+  ],
+);
+
+const userRoutes: RouteObject = guarded(
+  ['users.manage'],
+  [
+    {
+      path: '/users',
+      lazy: () => import('@/features/users/UsersPage').then((m) => ({ Component: m.UsersPage })),
+    },
+  ],
+);
+
 export const router = createBrowserRouter([
   {
     element: <RootLayout />,
@@ -33,101 +166,11 @@ export const router = createBrowserRouter([
             lazy: () =>
               import('@/features/dashboard/DashboardPage').then((m) => ({ Component: m.DashboardPage })),
           },
-          {
-            path: '/setup',
-            lazy: () => import('@/features/setup/SetupLayout').then((m) => ({ Component: m.SetupLayout })),
-            children: [
-              { index: true, element: <Navigate to="/setup/profile" replace /> },
-              {
-                path: 'profile',
-                lazy: () =>
-                  import('@/features/setup/SchoolProfilePage').then((m) => ({
-                    Component: m.SchoolProfilePage,
-                  })),
-              },
-              {
-                path: 'years',
-                lazy: () => import('@/features/setup/YearsPage').then((m) => ({ Component: m.YearsPage })),
-              },
-              {
-                path: 'classes',
-                lazy: () =>
-                  import('@/features/setup/ClassesPage').then((m) => ({ Component: m.ClassesPage })),
-              },
-              {
-                path: 'subjects',
-                lazy: () =>
-                  import('@/features/setup/SubjectsPage').then((m) => ({ Component: m.SubjectsPage })),
-              },
-              {
-                path: 'bell-schedules',
-                lazy: () =>
-                  import('@/features/setup/BellSchedulesPage').then((m) => ({
-                    Component: m.BellSchedulesPage,
-                  })),
-              },
-              {
-                path: 'attendance-mode',
-                lazy: () =>
-                  import('@/features/setup/AttendanceModePage').then((m) => ({
-                    Component: m.AttendanceModePage,
-                  })),
-              },
-              {
-                path: 'calendar',
-                lazy: () =>
-                  import('@/features/setup/CalendarPage').then((m) => ({ Component: m.CalendarPage })),
-              },
-            ],
-          },
-          {
-            path: '/staff',
-            lazy: () => import('@/features/staff/StaffLayout').then((m) => ({ Component: m.StaffLayout })),
-            children: [
-              {
-                index: true,
-                lazy: () =>
-                  import('@/features/staff/StaffDirectoryPage').then((m) => ({
-                    Component: m.StaffDirectoryPage,
-                  })),
-              },
-              {
-                path: 'groups',
-                lazy: () =>
-                  import('@/features/staff/StaffGroupsPage').then((m) => ({ Component: m.StaffGroupsPage })),
-              },
-              {
-                path: 'teaching',
-                lazy: () =>
-                  import('@/features/staff/TeachingBySectionPage').then((m) => ({
-                    Component: m.TeachingBySectionPage,
-                  })),
-              },
-            ],
-          },
-          {
-            path: '/staff/:staffId',
-            lazy: () =>
-              import('@/features/staff/StaffProfilePage').then((m) => ({ Component: m.StaffProfilePage })),
-          },
-          {
-            path: '/students',
-            lazy: () =>
-              import('@/features/students/StudentDirectoryPage').then((m) => ({
-                Component: m.StudentDirectoryPage,
-              })),
-          },
-          {
-            path: '/students/:studentId',
-            lazy: () =>
-              import('@/features/students/StudentProfilePage').then((m) => ({
-                Component: m.StudentProfilePage,
-              })),
-          },
-          {
-            path: '/users',
-            lazy: () => import('@/features/users/UsersPage').then((m) => ({ Component: m.UsersPage })),
-          },
+          setupRoutes,
+          staffRoutes,
+          studentRoutes,
+          admissionRoutes,
+          userRoutes,
           {
             path: '/operator/onboarding',
             lazy: () =>
