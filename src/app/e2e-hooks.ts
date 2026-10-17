@@ -1,3 +1,4 @@
+import { queryClient } from '@/lib/query-client';
 import { getSetupSnapshot } from '@/lib/rpc';
 import { sessionStore } from '@/lib/session/store';
 
@@ -10,6 +11,7 @@ declare global {
       revision: () => number | null;
       forceStaleRevision: () => void;
       probeSchoolRpc: () => Promise<string>;
+      cachedQueryKeys: () => unknown[][];
     };
   }
 }
@@ -26,5 +28,11 @@ export function installE2EHooks(): void {
         () => 'ok',
         (e: { code?: string }) => e.code ?? 'error',
       ),
+    // Lets a test check that switching context leaves no query from the previous context cached.
+    cachedQueryKeys: () =>
+      queryClient
+        .getQueryCache()
+        .getAll()
+        .map((q) => [...q.queryKey]),
   };
 }
