@@ -111,6 +111,10 @@ export const router = createBrowserRouter([
               import('@/features/staff/StaffProfilePage').then((m) => ({ Component: m.StaffProfilePage })),
           },
           {
+            path: '/users',
+            lazy: () => import('@/features/users/UsersPage').then((m) => ({ Component: m.UsersPage })),
+          },
+          {
             path: '/operator/onboarding',
             lazy: () =>
               import('@/features/operator/OnboardingPage').then((m) => ({
