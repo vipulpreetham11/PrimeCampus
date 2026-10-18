@@ -5,7 +5,7 @@ import type { ActiveContext } from '@/contracts/session';
 // never from role names. Upcoming areas are listed as plain text — never clickable (PRD §15).
 
 export type NavIcon =
-  'dashboard' | 'setup' | 'calendar' | 'students' | 'admissions' | 'staff' | 'users' | 'operator';
+  'dashboard' | 'setup' | 'calendar' | 'students' | 'admissions' | 'staff' | 'users' | 'imports' | 'operator';
 
 export interface LiveNavItem {
   kind: 'live';
@@ -43,6 +43,7 @@ const LIVE: LiveRule[] = [
   { label: 'Admissions', to: '/admissions', icon: 'admissions', anyOf: ['admissions.manage'] },
   { label: 'Staff', to: '/staff', icon: 'staff', anyOf: ['staff.read'] },
   { label: 'Users & logins', to: '/users', icon: 'users', anyOf: ['users.manage'] },
+  { label: 'Imports', to: '/imports', icon: 'imports', anyOf: ['imports.manage'] },
   { label: 'School setup', to: '/setup', icon: 'setup', anyOf: ['setup.manage'] },
   {
     label: 'School calendar',
