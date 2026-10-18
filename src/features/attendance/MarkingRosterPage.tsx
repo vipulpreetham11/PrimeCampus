@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useLocation, useParams } from 'react-router';
 import { ArrowLeft, Info } from 'lucide-react';
 import { DataState } from '@/components/shared/DataState';
 import { ErrorText } from '@/components/shared/ErrorText';
@@ -104,6 +104,7 @@ function RosterScreen({
 }) {
   const lesson = useDiaryEntry(target.kind === 'period' ? target.lessonId : null);
   const sectionNames = useSectionNames();
+  const location = useLocation();
   const invalidate = useInvalidateAttendance();
   const today = schoolToday();
 
@@ -182,11 +183,16 @@ function RosterScreen({
 
   const unmarkedNow = counts.unmarked;
   const allUnmarked = unmarkedNow === students.length;
-  const sectionLabel = sectionNames.get(data.section_id) ?? lesson.data?.lesson.section ?? 'Section';
+  // the section name: Today passes it with the link; otherwise the setup snapshot / the lesson
+  const passed = (location.state as { section?: string } | null)?.section;
+  const sectionLabel = sectionNames.get(data.section_id) ?? lesson.data?.lesson.section ?? passed ?? null;
+  const lessonTitle = lesson.data
+    ? `${lesson.data.lesson.section} · ${lesson.data.lesson.subject}`
+    : sectionLabel;
   const title =
     target.kind === 'period'
-      ? `Attendance — ${lesson.data ? `${lesson.data.lesson.section} · ${lesson.data.lesson.subject}` : sectionLabel}`
-      : `Day attendance — ${sectionLabel}`;
+      ? `Attendance${lessonTitle ? ` — ${lessonTitle}` : ''}`
+      : `Day attendance${sectionLabel ? ` — ${sectionLabel}` : ''}`;
 
   return (
     <div className="space-y-4" data-testid="marking-roster">
@@ -253,7 +259,11 @@ function RosterScreen({
                 disabled={unmarkedNow === 0 || saver.phase === 'saving'}
                 onClick={() => setRoster((r) => fillUnmarked(r, 'P' as AttendanceStatus))}
               >
-                {allUnmarked ? 'Mark all present' : `Mark remaining ${unmarkedNow} present`}
+                {unmarkedNow === 0
+                  ? 'Everyone is marked'
+                  : allUnmarked
+                    ? 'Mark all present'
+                    : `Mark remaining ${unmarkedNow} present`}
               </Button>
               {(pending > 0 || counts.conflict > 0) && (
                 <Button

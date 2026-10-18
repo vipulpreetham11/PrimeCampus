@@ -100,7 +100,7 @@ function TodayView({ t }: { t: TeacherToday }) {
                   <MarkedText marked={s.daily_marked} eligible={s.eligible} />
                 </div>
                 <Button asChild className="min-h-11">
-                  <Link to={`/attendance/daily/${s.section_id}/${t.date}`}>
+                  <Link to={`/attendance/daily/${s.section_id}/${t.date}`} state={{ section: s.section }}>
                     <ClipboardCheck aria-hidden="true" /> Day attendance
                   </Link>
                 </Button>

@@ -32,7 +32,9 @@ function DayLessons({
       <EmptyDay
         text={
           working
-            ? 'No lessons on this day. Lessons appear after the timetable is activated and lessons are updated.'
+            ? props.lessonLink
+              ? 'No lessons on this day. Lessons appear after the timetable is activated and lessons are updated.'
+              : 'No lessons on this day.'
             : `${dayTypeText(day)} — no lessons.`
         }
       />

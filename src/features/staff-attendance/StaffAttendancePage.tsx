@@ -213,9 +213,11 @@ function StaffRoster({ data, reload }: { data: StaffAttendance; reload: () => Pr
             disabled={counts.unmarked === 0 || saver.phase === 'saving'}
             onClick={() => setRoster((r) => fillUnmarked(r, 'P' as AttendanceStatus))}
           >
-            {counts.unmarked === staff.length
-              ? 'Mark all present'
-              : `Mark remaining ${counts.unmarked} present`}
+            {counts.unmarked === 0
+              ? 'Everyone is marked'
+              : counts.unmarked === staff.length
+                ? 'Mark all present'
+                : `Mark remaining ${counts.unmarked} present`}
           </Button>
           {(pending > 0 || counts.conflict > 0) && (
             <Button variant="ghost" className="min-h-11" onClick={() => setRoster((r) => discardChanges(r))}>

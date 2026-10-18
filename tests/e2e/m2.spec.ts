@@ -318,7 +318,7 @@ test('2. Teacher "Today": period attendance (mark all present + 2 exceptions); a
   await tabB.goto(page.url());
   await expect(tabB.getByTestId('marking-roster')).toBeVisible();
 
-  const fill = page.getByRole('button', { name: /^Mark (all|remaining \d+) present$/ });
+  const fill = page.getByRole('button', { name: /^(Mark (all|remaining \d+) present|Everyone is marked)$/ });
   if (await fill.isEnabled()) await fill.click();
   const rows = page.getByTestId('roster-row');
   await rows.nth(0).getByRole('radio', { name: 'Absent' }).click();
@@ -355,7 +355,7 @@ test('3. Day-wise date: the class teacher marks the day register, including a ha
   const ct = page.getByTestId('ct-section').filter({ hasText: SECTION_A });
   await ct.getByRole('link', { name: 'Day attendance' }).click();
   await expect(page.getByTestId('marking-roster')).toBeVisible();
-  const fill = page.getByRole('button', { name: /^Mark (all|remaining \d+) present$/ });
+  const fill = page.getByRole('button', { name: /^(Mark (all|remaining \d+) present|Everyone is marked)$/ });
   if (await fill.isEnabled()) await fill.click();
   // two students get a half day and an absence every run (alternating, so each run really saves)
   const first = page.getByTestId('roster-row').nth(0);
@@ -386,7 +386,7 @@ test('4. Admin marks a teacher absent → the day view flags it → substitute a
   // 8 (admin part): staff attendance for PAST — Meera Rao absent, everyone else present
   await page.goto(`/staff-attendance?date=${D.past}`);
   await expect(page.getByTestId('staff-roster')).toBeVisible({ timeout: 30_000 });
-  const fill = page.getByRole('button', { name: /^Mark (all|remaining \d+) present$/ });
+  const fill = page.getByRole('button', { name: /^(Mark (all|remaining \d+) present|Everyone is marked)$/ });
   if (await fill.isEnabled()) await fill.click();
   const meera = page.getByTestId('staff-row').filter({ hasText: 'Meera Rao' });
   await meera.getByRole('radio', { name: 'Absent' }).click();
