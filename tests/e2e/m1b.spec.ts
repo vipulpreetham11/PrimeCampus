@@ -160,8 +160,12 @@ async function editRow(page: Page, n: number, field: string, value: string) {
   await expect(dlg).toBeHidden();
 }
 
-const shot = (page: Page, name: string) =>
-  page.screenshot({ path: `${SCREENS}/375-${name}.png`, fullPage: true });
+async function shot(page: Page, name: string) {
+  // Toasts are transient and would cover the page; scroll up so the sticky header is captured in place.
+  await page.addStyleTag({ content: '[data-sonner-toaster] { display: none !important; }' });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({ path: `${SCREENS}/375-${name}.png`, fullPage: true });
+}
 const noHorizontalScroll = async (page: Page) =>
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
 
