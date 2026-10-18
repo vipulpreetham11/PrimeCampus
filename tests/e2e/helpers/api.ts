@@ -118,8 +118,17 @@ export function newPassword(): string {
  */
 export async function setKnownPassword(manager: ApiSession, username: string): Promise<string> {
   if (!username.startsWith('demo.')) throw new Error('safety: demo logins only');
-  const found = await manager.rpc<{ account_id: string } | null>('op_find_account', { p_username: username });
+  const found = await manager.rpc<{
+    account_id: string;
+    memberships: { school_id: string }[];
+  } | null>('op_find_account', { p_username: username });
   if (!found) throw new Error(`${username} not found`);
+  // Safety: only reset a login whose every membership is in the Demo School.
+  const schools = await manager.rpc<{ school_id: string; code: string }[]>('op_list_schools');
+  const demoId = schools.find((s) => s.code === 'demo')?.school_id;
+  if (!demoId || found.memberships.length === 0 || found.memberships.some((m) => m.school_id !== demoId)) {
+    throw new Error(`safety: ${username} has a membership outside the Demo School — not resetting it`);
+  }
   const { temporary_password } = await manager.edge<{ temporary_password: string }>('reset_password', {
     account_id: found.account_id,
   });
@@ -135,13 +144,4 @@ export async function operatorSession(): Promise<ApiSession> {
   const p = process.env.E2E_OPERATOR_PASSWORD;
   if (!u || !p) throw new Error('E2E_OPERATOR_USERNAME / E2E_OPERATOR_PASSWORD not set');
   return ApiSession.signIn(u, p);
-}
-
-export function accountExists(op: ApiSession, username: string) {
-  return op.rpc<{ account_id: string; memberships: { role: string; status: string }[] } | null>(
-    'op_find_account',
-    {
-      p_username: username,
-    },
-  );
 }

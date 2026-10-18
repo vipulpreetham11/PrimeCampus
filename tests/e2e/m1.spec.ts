@@ -99,6 +99,8 @@ const STUDENTS: DemoStudent[] = [
 ];
 
 test.describe.configure({ mode: 'serial' });
+// The one-time password dialog and typed passwords would be recorded by traces/screenshots/videos.
+test.use({ trace: 'off', screenshot: 'off', video: 'off' });
 test.skip(!OPERATOR || !OPERATOR_PASSWORD, 'E2E_OPERATOR_USERNAME / E2E_OPERATOR_PASSWORD not set');
 
 // ------------------------------------------------------------------ shared state (memory only)
@@ -163,20 +165,26 @@ async function settled(...locators: Locator[]) {
   await expect(l.first()).toBeVisible({ timeout: 30_000 });
 }
 
+/** Secrets are compared as booleans: a failing expect() must never print a password. */
+function expectAbsent(haystack: string, secret: string, where: string) {
+  expect(haystack.includes(secret), `the temporary password must not be in ${where}`).toBe(false);
+}
+
 async function readSecretOnce(page: Page): Promise<string> {
   const secret = page.getByTestId('one-time-secret');
-  await expect(secret).toBeVisible({ timeout: 30_000 });
+  const close = page.getByRole('button', { name: /I have noted it/ });
+  await expect(close).toBeVisible({ timeout: 30_000 });
   const value = (await secret.textContent())?.trim() ?? '';
-  expect(value).toMatch(/^[A-Za-z0-9]{14}$/);
-  await page.getByRole('button', { name: /I have noted it/ }).click();
-  await expect(secret).toBeHidden();
+  expect(/^[A-Za-z0-9]{14}$/.test(value), 'temporary password has the expected format').toBe(true);
+  await close.click();
+  await expect.poll(() => secret.count(), { message: 'one-time dialog closed' }).toBe(0);
   // Shown once: not left in the page, the URL or browser storage.
-  expect(await page.content()).not.toContain(value);
-  expect(page.url()).not.toContain(value);
+  expectAbsent(await page.content(), value, 'the page');
+  expectAbsent(page.url(), value, 'the URL');
   const stored = await page.evaluate(
     () => JSON.stringify({ ...localStorage }) + JSON.stringify({ ...sessionStorage }),
   );
-  expect(stored).not.toContain(value);
+  expectAbsent(stored, value, 'browser storage');
   return value;
 }
 
@@ -434,7 +442,7 @@ test('2. Admin creates staff groups, staff and teaching assignments (class teach
       .locator('[data-slot="card"]')
       .filter({ has: page.getByText('Teaches', { exact: true }) });
     await settled(
-      teaches.getByText('No current assignments'),
+      teaches.getByText('No current or upcoming assignments'),
       teaches.getByText(a.text),
       teaches.getByText(/ · /),
     );
@@ -737,7 +745,7 @@ test('8. A role without staff_finance (Teacher) never sees salary fields — UI 
   browser,
 }) => {
   test.setTimeout(180_000);
-  expect(pw.teacher, 'test 3 sets the teacher password').toBeTruthy();
+  expect(Boolean(pw.teacher), 'test 3 sets the teacher password').toBe(true);
   const mark = seen.length;
   const { context, page } = await newPage(browser);
   await signIn(page, 'demo.teacher', pw.teacher!);

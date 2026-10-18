@@ -10,6 +10,8 @@ const GENERIC = 'The username or password is incorrect.';
 const SCREENS = 'docs/reports/m0-screens';
 
 test.describe.configure({ mode: 'serial' });
+// The one-time password dialog and typed passwords would be recorded by traces/screenshots/videos.
+test.use({ trace: 'off', screenshot: 'off', video: 'off' });
 test.skip(!OPERATOR || !OPERATOR_PASSWORD, 'E2E_OPERATOR_USERNAME / E2E_OPERATOR_PASSWORD not set');
 
 // ------------------------------------------------------------------ network audit (every test)
@@ -76,33 +78,35 @@ test('1. Operator creates Demo School if missing, provisions demo.admin, sees th
   await page.getByLabel('Full name').fill('Demo Admin');
   await page.getByRole('button', { name: 'Create Admin login' }).click();
 
+  // Assertions target the dialog's button, never the secret element, so a failure can't print it.
   const secret = page.getByTestId('one-time-secret');
+  const noted = page.getByRole('button', { name: /I have noted it/ });
   const reissue = page.getByRole('button', { name: 'Issue a new temporary password' });
-  await expect(secret.or(reissue)).toBeVisible();
+  await expect(noted.or(reissue)).toBeVisible();
   if (await reissue.isVisible()) {
     // demo.admin exists from an earlier run → op_find_account + Edge reset_password
     await reissue.click();
   }
-  await expect(secret).toBeVisible();
+  await expect(noted).toBeVisible();
   tempPassword = (await secret.textContent())?.trim() ?? '';
-  expect(tempPassword).toMatch(/^[A-Za-z0-9]{14}$/);
+  expect(/^[A-Za-z0-9]{14}$/.test(tempPassword), 'temporary password has the expected format').toBe(true);
 
   // Shown once: closing removes it and it is not stored anywhere in the browser.
-  await page.getByRole('button', { name: /I have noted it/ }).click();
-  await expect(secret).toBeHidden();
-  expect(await page.content()).not.toContain(tempPassword);
+  await noted.click();
+  await expect.poll(() => secret.count(), { message: 'one-time dialog closed' }).toBe(0);
+  expect((await page.content()).includes(tempPassword), 'temporary password left in the page').toBe(false);
   const stored = await page.evaluate(
     () => JSON.stringify({ ...localStorage }) + JSON.stringify({ ...sessionStorage }),
   );
-  expect(stored).not.toContain(tempPassword);
-  expect(page.url()).not.toContain(tempPassword);
+  expect(stored.includes(tempPassword), 'temporary password in browser storage').toBe(false);
+  expect(page.url().includes(tempPassword), 'temporary password in the URL').toBe(false);
   await context.close();
 });
 
 test('2. demo.admin signs in with the temp password, is forced to change it, lands on the Admin shell', async ({
   browser,
 }) => {
-  expect(tempPassword, 'test 1 must provide a temporary password').not.toBe('');
+  expect(tempPassword !== '', 'test 1 must provide a temporary password').toBe(true);
   const { context, page } = await newPage(browser, { width: 375, height: 812 });
   await signIn(page, DEMO_ADMIN, tempPassword);
   await expect(page).toHaveURL(/\/change-password$/);

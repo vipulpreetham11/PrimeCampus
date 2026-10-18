@@ -11,6 +11,9 @@ for (const line of readFileSync(new URL('./.env.example', import.meta.url), 'utf
   if (m) publicEnv[m[1]!] = process.env[m[1]!] ?? m[2]!;
 }
 
+// No "error context" page snapshot on failure: it could capture a one-time password dialog.
+process.env.PLAYWRIGHT_NO_COPY_PROMPT = '1';
+
 const port = 4173;
 const proxy = process.env.HTTPS_PROXY || process.env.https_proxy;
 
