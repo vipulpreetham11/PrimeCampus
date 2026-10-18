@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { CreateCheckNotice } from '@/components/shared/CreateCheckNotice';
 import { DateInput } from '@/components/shared/DateInput';
 import { ErrorText } from '@/components/shared/ErrorText';
 import { Button } from '@/components/ui/button';
@@ -14,12 +15,15 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { isUncertainFailure, useCreateCheck } from '@/lib/create-check';
 import { addDays, compareIsoDates, formatDate } from '@/lib/dates';
 import { toAppError, type AppError } from '@/lib/errors';
 import { isConflict } from '@/lib/save-feedback';
-import { useSaveHomework } from './hooks';
+import { findCreatedHomework, useSaveHomework } from './hooks';
 
 // Set homework from a lesson, or edit / cancel it (with the version the teacher saw).
+// Creating has no operation id: after an uncertain failure the dialog looks for the homework in
+// the lesson's list before the teacher may press "Set homework" again (no duplicates).
 
 export const MAX_HOMEWORK_TEXT = 4000;
 
@@ -37,8 +41,8 @@ export function HomeworkFormDialog({
   title,
   onClose,
 }: {
-  /** Create: the lesson the homework is set in. */
-  lesson?: { lesson_session_id: number; date: string };
+  /** Create: the lesson the homework is set in, and the homework it already has. */
+  lesson?: { lesson_session_id: number; date: string; section_id: string; existingIds: readonly string[] };
   /** Edit: the homework as displayed. */
   homework?: EditableHomework;
   title: string;
@@ -51,6 +55,8 @@ export function HomeworkFormDialog({
   const [problem, setProblem] = useState<string | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const save = useSaveHomework();
+  const check = useCreateCheck();
+  const busy = save.isPending || check.blocksRetry;
 
   const onConflict = () => {
     toast.warning(
@@ -66,6 +72,7 @@ export function HomeworkFormDialog({
 
   const submit = () => {
     setError(null);
+    check.reset();
     const trimmed = text.trim();
     if (!trimmed) return setProblem('Describe the homework.');
     if (trimmed.length > MAX_HOMEWORK_TEXT) return setProblem(`At most ${MAX_HOMEWORK_TEXT} characters.`);
@@ -91,14 +98,28 @@ export function HomeworkFormDialog({
         },
       );
     } else if (lesson) {
+      const created = () => {
+        toast.success('Homework set.');
+        onClose();
+      };
       save.mutate(
         { kind: 'create', lessonId: lesson.lesson_session_id, dueOn, description: trimmed },
         {
-          onSuccess: () => {
-            toast.success('Homework set.');
-            onClose();
+          onSuccess: created,
+          onError: (e) => {
+            if (!isUncertainFailure(e)) return fail(e);
+            check.verify(
+              () =>
+                findCreatedHomework({
+                  lessonId: lesson.lesson_session_id,
+                  date: lesson.date,
+                  sectionId: lesson.section_id,
+                  description: trimmed,
+                  knownIds: lesson.existingIds,
+                }),
+              created,
+            );
           },
-          onError: fail,
         },
       );
     }
@@ -136,6 +157,7 @@ export function HomeworkFormDialog({
               </p>
             )}
             <ErrorText error={error} />
+            <CreateCheckNotice check={check} />
           </div>
           <DialogFooter className="gap-2">
             {homework && (
@@ -151,7 +173,7 @@ export function HomeworkFormDialog({
             <Button variant="outline" onClick={onClose} disabled={save.isPending}>
               Close
             </Button>
-            <Button onClick={submit} disabled={save.isPending}>
+            <Button onClick={submit} disabled={busy}>
               {homework ? 'Save changes' : 'Set homework'}
             </Button>
           </DialogFooter>

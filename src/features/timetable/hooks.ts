@@ -8,6 +8,7 @@ import {
   listTimetableVersions,
   saveTimetableDraft,
 } from '@/lib/rpc';
+import type { TimetableVersionRow } from '@/contracts/timetable';
 import { useScopedKey } from '@/lib/scope';
 
 // Timetable versions and lesson generation (brief §1). Reads: list_timetable_versions /
@@ -136,8 +137,33 @@ export function useCopyTimetable() {
         p_effective_from: v.effectiveFrom,
         p_keep_teachers: v.keepTeachers,
       }),
-    onSettled: invalidate,
+    // not awaited: after an uncertain copy the dialog says "checking" at once, not after the refresh
+    onSettled: () => void invalidate(),
   });
+}
+
+/**
+ * After an uncertain failure of copy_timetable (no operation id): the draft the copy would have made
+ * in the target section — copied from the source, starting on that date, and not one of the versions
+ * the section already had (`knownIds`) — or null.
+ */
+export async function findCopiedDraft(v: {
+  fromVersionId: string;
+  targetSectionId: string;
+  effectiveFrom: string;
+  knownIds: readonly string[];
+}): Promise<TimetableVersionRow | null> {
+  const known = new Set(v.knownIds);
+  const versions = await listTimetableVersions({ p_section_id: v.targetSectionId });
+  return (
+    versions.find(
+      (t) =>
+        t.status === 'draft' &&
+        t.copied_from_id === v.fromVersionId &&
+        t.effective_from === v.effectiveFrom &&
+        !known.has(t.timetable_version_id),
+    ) ?? null
+  );
 }
 
 export function useGenerateLessons() {

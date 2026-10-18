@@ -281,7 +281,12 @@ function LessonHomework({ lesson, canSet }: { lesson: DiaryEntry['lesson']; canS
       )}
       {creating && (
         <HomeworkFormDialog
-          lesson={{ lesson_session_id: lesson.lesson_session_id, date: lesson.date }}
+          lesson={{
+            lesson_session_id: lesson.lesson_session_id,
+            date: lesson.date,
+            section_id: lesson.section_id,
+            existingIds: items.map((h) => h.assignment_id),
+          }}
           title={`Set homework — ${lesson.subject}, ${lesson.section}`}
           onClose={() => setCreating(false)}
         />

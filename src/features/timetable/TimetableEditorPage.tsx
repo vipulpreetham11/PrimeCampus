@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { AlertTriangle, ArrowLeft, Copy, Loader2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { CreateCheckNotice } from '@/components/shared/CreateCheckNotice';
 import { DataState } from '@/components/shared/DataState';
 import { DateInput } from '@/components/shared/DateInput';
 import { ErrorText } from '@/components/shared/ErrorText';
@@ -23,6 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import type { TimetableConflict, TimetableDraftSaved, TimetableVersion } from '@/contracts/timetable';
 import { useClassSubjects, useSetupSnapshot } from '@/features/setup/hooks';
+import { isUncertainFailure, useCreateCheck } from '@/lib/create-check';
 import { formatTime, maxDate, schoolToday, weekdayLong, weekdayShort } from '@/lib/dates';
 import { AppError, routeId, toAppError } from '@/lib/errors';
 import { isConflict } from '@/lib/save-feedback';
@@ -40,11 +42,13 @@ import {
   type Grid,
 } from './grid-model';
 import {
+  findCopiedDraft,
   useActivateTimetable,
   useCopyTimetable,
   useDiscardDraft,
   useSaveTimetableDraft,
   useTimetableVersion,
+  useTimetableVersions,
 } from './hooks';
 import { GenerateLessonsForm } from './LessonsGenerate';
 import { SectionSelect, useSectionNames, useSectionOptions, useTeacherOptions } from './pickers';
@@ -759,7 +763,44 @@ function CopyDialog({
   const [keepTeachers, setKeepTeachers] = useState(false);
   const [error, setError] = useState<AppError | null>(null);
   const copy = useCopyTimetable();
+  const check = useCreateCheck();
+  // the target's versions before the copy: after an uncertain failure, a new draft among them is ours
+  const targetVersions = useTimetableVersions(target);
   const outOfYear = !!year && (start < year.start_date || start > year.end_date);
+
+  const submit = () => {
+    if (!target || !targetVersions.data) return;
+    setError(null);
+    check.reset();
+    const request = {
+      fromVersionId: version.timetable_version_id,
+      targetSectionId: target,
+      effectiveFrom: start,
+      keepTeachers,
+    };
+    const knownIds = targetVersions.data.map((v) => v.timetable_version_id);
+    copy.mutate(request, {
+      onSuccess: (r) => {
+        toast.success(
+          r.conflicts.length > 0
+            ? `Draft created with ${r.conflicts.length} teacher clashes to fix.`
+            : 'Draft created.',
+        );
+        onCopied(r.timetable_version_id);
+      },
+      onError: (e) => {
+        // copy_timetable has no operation id: look for the draft before allowing another copy
+        if (!isUncertainFailure(e)) return setError(toAppError(e));
+        check.verify(
+          () => findCopiedDraft({ ...request, knownIds }),
+          (draft) => {
+            toast.success('Draft created. Open it to check for teacher clashes.');
+            onCopied(draft.timetable_version_id);
+          },
+        );
+      },
+    });
+  };
 
   return (
     <Dialog open onOpenChange={(o) => !o && !copy.isPending && onClose()}>
@@ -797,36 +838,19 @@ function CopyDialog({
             <Switch id="copy-keep" checked={keepTeachers} onCheckedChange={setKeepTeachers} />
             <Label htmlFor="copy-keep">Keep the teachers (otherwise every period is Unassigned)</Label>
           </div>
+          {targetVersions.isError && <ErrorText error={targetVersions.error} />}
           <ErrorText error={error} />
+          <CreateCheckNotice check={check} />
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={copy.isPending}>
             Cancel
           </Button>
           <Button
-            disabled={!target || !start || outOfYear || copy.isPending}
-            onClick={() =>
-              target &&
-              copy.mutate(
-                {
-                  fromVersionId: version.timetable_version_id,
-                  targetSectionId: target,
-                  effectiveFrom: start,
-                  keepTeachers,
-                },
-                {
-                  onSuccess: (r) => {
-                    toast.success(
-                      r.conflicts.length > 0
-                        ? `Draft created with ${r.conflicts.length} teacher clashes to fix.`
-                        : 'Draft created.',
-                    );
-                    onCopied(r.timetable_version_id);
-                  },
-                  onError: (e) => setError(toAppError(e)),
-                },
-              )
+            disabled={
+              !target || !targetVersions.data || !start || outOfYear || copy.isPending || check.blocksRetry
             }
+            onClick={submit}
           >
             Copy
           </Button>

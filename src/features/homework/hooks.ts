@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Correction } from '@/contracts/academic';
+import type { Correction, HomeworkListItem } from '@/contracts/academic';
 import {
   getHomeworkRoster,
   getStudentHomework,
@@ -53,8 +53,43 @@ export function useSaveHomework() {
   const invalidate = useInvalidateHomework();
   return useMutation({
     mutationFn: (v: HomeworkSave) => saveHomework(homeworkArgs(v)),
-    onSettled: invalidate,
+    // not awaited: after an uncertain create the dialog says "checking" at once, not after the refresh
+    onSettled: () => void invalidate(),
   });
+}
+
+/**
+ * After an uncertain failure of a create (save_homework has no operation id): the lesson's active
+ * homework with this description that wasn't there before (`knownIds`), or null. Reads the same
+ * list_homework the lesson page shows (its date and section).
+ */
+export async function findCreatedHomework(v: {
+  lessonId: number;
+  date: string;
+  sectionId: string;
+  description: string;
+  knownIds: readonly string[];
+}): Promise<HomeworkListItem | null> {
+  const known = new Set(v.knownIds);
+  let cursor: { before_date: string; before_id: string } | null = null;
+  // one lesson's day in one section: a single page in practice; a few pages at most
+  for (let page = 0; page < 10; page += 1) {
+    const res = await listHomework({
+      p_from: v.date,
+      p_to: v.date,
+      p_section_id: v.sectionId,
+      p_status: 'active',
+      ...(cursor ? { p_before_date: cursor.before_date, p_before_id: cursor.before_id } : {}),
+    });
+    const hit = res.items.find(
+      (h) =>
+        h.lesson_session_id === v.lessonId && h.description === v.description && !known.has(h.assignment_id),
+    );
+    if (hit) return hit;
+    if (!res.next_cursor) return null;
+    cursor = res.next_cursor;
+  }
+  return null;
 }
 
 export interface HomeworkFilter {
