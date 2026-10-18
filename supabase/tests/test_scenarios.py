@@ -302,7 +302,7 @@ chk = teacher1.rpc("mark_homework_checks", op(), hw["assignment_id"], "2026-10-0
                     {"student_id":str(s4),"completion":"not_completed","correction":"required"}])
 check("checks saved", chk["saved"] == 2, chk)
 entered = su("select observed_on, entered_at::date as e from app.homework_checks where student_id=%s", (s1,))[0]
-check("observation date distinct from entry date (delayed entry)", str(entered["observed_on"]) == "2026-10-01" and str(entered["e"]) == "2026-10-05", entered)
+check("observation date distinct from entry date (delayed entry)", str(entered["observed_on"]) == "2026-10-01" and str(entered["e"]) != "2026-10-01", entered)
 ros2 = teacher1.rpc("get_homework_roster", hw["assignment_id"])
 s3state = [s for s in ros2["students"] if s["student_id"] == str(s3)][0]["state"]
 check("unchecked student stays 'unchecked' (not 'not_completed')", s3state == "unchecked", s3state)
@@ -340,7 +340,7 @@ bank = acct.rpc("save_receiving_account", {"label":"SBI current","kind":"bank","
 term1 = acct.rpc("save_fee_term", y, "Term 1", 1, "2026-07-15")["fee_term_id"]
 acct.rpc("save_fee_structure", term1, cls2, [{"fee_head_id":tui,"amount_paise":1000000},{"fee_head_id":trn,"amount_paise":300000}])
 sib = acct.rpc("save_concession_preset", "Sibling 10%", "percent", "{%s}" % tui, 1000)["concession_preset_id"]
-acct.rpc("grant_concession", s2, y, sib, "Second child")
+acct.rpc("grant_concession", str(uuid.uuid4()), s2, y, sib, "Second child")
 acct.rpc("set_optional_fee", s1, y, trn, True)
 prev = acct.rpc("preview_term_invoices", term1, None, None)
 p1 = [p for p in prev if p["student_id"] == str(s1)][0]
