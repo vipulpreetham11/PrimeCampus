@@ -71,9 +71,10 @@ export function LessonRefreshResult({ result }: { result: LessonsGenerated }) {
           <ul className="mt-1 space-y-1 text-sm" data-testid="kept-lessons">
             {result.kept_used.map((k) => (
               <li key={k.lesson_session_id} className="flex flex-wrap gap-x-2">
-                <span>{formatDayShort(k.date)}</span>
-                <span>· {sectionNames.get(k.section_id) ?? 'Section'}</span>
-                <span>· Slot {k.slot_ordinal}</span>
+                <span>
+                  {formatDayShort(k.date)} · {sectionNames.get(k.section_id) ?? 'Section'} · Slot{' '}
+                  {k.slot_ordinal}
+                </span>
                 <Link className="underline" to={`/schedule?date=${k.date}&section=${k.section_id}`}>
                   Open day
                 </Link>
