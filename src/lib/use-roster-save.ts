@@ -16,6 +16,8 @@ import {
 // and batch (CLAUDE.md rule 4): an uncertain failure (offline, timeout, unknown) keeps the id and
 // the unsaved marks, so "Retry" resends exactly the same request; only success or a definite
 // refusal starts a new id. Marks are never dropped on failure and never written to storage.
+// A batch's tracker is keyed by the batch's row ids, not its position: once earlier batches have
+// saved, the retry of a failed batch is the first batch, and it must still get its own id back.
 
 export type SavePhase = 'idle' | 'saving' | 'saved' | 'not_saved' | 'refused';
 
@@ -49,7 +51,7 @@ export interface RosterSave<V> {
 
 export function useRosterSave<V>(options: RosterSaveOptions<V>): RosterSave<V> {
   const { setRoster, batchSize, send, payloadOf, reload } = options;
-  const trackers = useRef<OperationTracker[]>([]);
+  const trackers = useRef(new Map<string, OperationTracker>());
   const [phase, setPhase] = useState<SavePhase>('idle');
   const [error, setError] = useState<AppError | null>(null);
   const [conflictCount, setConflictCount] = useState(0);
@@ -62,12 +64,15 @@ export function useRosterSave<V>(options: RosterSaveOptions<V>): RosterSave<V> {
       setError(null);
       let conflicts = 0;
       let failure: AppError | null = null;
-      for (const [i, batch] of batches.entries()) {
-        const tracker = (trackers.current[i] ??= new OperationTracker());
+      for (const batch of batches) {
+        const key = batchKey(batch);
+        let tracker = trackers.current.get(key);
+        if (!tracker) trackers.current.set(key, (tracker = new OperationTracker()));
         const operationId = tracker.idFor(payloadOf(batch));
         try {
           const result = await send(batch, operationId);
           tracker.succeeded();
+          trackers.current.delete(key);
           conflicts += result.conflicts.length;
           setRoster((r) =>
             applySaveResult(
@@ -100,6 +105,14 @@ export function useRosterSave<V>(options: RosterSaveOptions<V>): RosterSave<V> {
   }, []);
 
   return { phase, error, conflictCount, save, acknowledge };
+}
+
+/** A batch's identity: its row ids, sorted and joined. */
+export function batchKey(rows: { id: string }[]): string {
+  return rows
+    .map((r) => r.id)
+    .sort()
+    .join(',');
 }
 
 /**
