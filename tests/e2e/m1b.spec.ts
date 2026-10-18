@@ -62,7 +62,16 @@ async function asUser(
   await page.getByLabel('Username').fill(username);
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
+  await expectDemoSchool(page);
   return { context, page };
+}
+
+/** Safety guard before acting (as in M0/M1): the header must show the Demo School. */
+async function expectDemoSchool(page: Page) {
+  await expect(page.getByTestId('context-summary').filter({ visible: true }).first()).toContainText(
+    'Demo School',
+    { timeout: 30_000 },
+  );
 }
 
 async function asAdmin(browser: Browser, viewport?: { width: number; height: number }) {
@@ -509,9 +518,10 @@ test('5. Placements into 2027-28 → students placed; the 2026-27 placement clos
   const history = page.getByTestId('placements');
   await expect(history).toContainText(`${NEXT_YEAR.name}: Class 1 A · Roll ${ROLL(1)}`, { timeout: 30_000 });
   await expect(history).toContainText('1 Apr 2027 – now');
-  // 2026-27 placement: effective_to is exclusive = the day after the year's last day (31 Mar 2027).
+  // 2026-27 placement: closed at that year's end. effective_to is stored exclusive (1 Apr 2027); the
+  // profile shows the last day in the section.
   await expect(history.getByText(/^2026-27: Class 1 A/)).toBeVisible();
-  await expect(history).toContainText('1 Apr 2026 – 1 Apr 2027');
+  await expect(history).toContainText('1 Apr 2026 – 31 Mar 2027');
   await context.close();
 });
 
