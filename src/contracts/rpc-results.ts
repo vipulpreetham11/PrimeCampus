@@ -72,6 +72,42 @@ import {
   stageResultSchema,
   startImportResultSchema,
 } from './imports';
+import {
+  lessonUpdatedSchema,
+  lessonsGeneratedSchema,
+  scheduleDaySchema,
+  scheduleLessonSchema,
+  substituteAssignedSchema,
+  substituteSuggestionSchema,
+  substitutionRowSchema,
+  teacherTodaySchema,
+  timetableActivatedSchema,
+  timetableCopiedSchema,
+  timetableDiscardedSchema,
+  timetableDraftSavedSchema,
+  timetableVersionRowSchema,
+  timetableVersionSchema,
+} from './timetable';
+import {
+  attendanceOverviewSchema,
+  attendanceRecordSchema,
+  attendanceSummarySchema,
+  markingRosterSchema,
+  staffAttendanceSchema,
+  staffMarksSavedSchema,
+  studentMarksSavedSchema,
+} from './attendance';
+import {
+  diaryEntrySchema,
+  diaryPageSchema,
+  diarySavedSchema,
+  homeworkChecksSavedSchema,
+  homeworkPageSchema,
+  homeworkRosterSchema,
+  homeworkSavedSchema,
+  studentDiaryItemSchema,
+  studentHomeworkItemSchema,
+} from './academic';
 
 // Response schemas per RPC. The RPC layer validates a response when its function is listed
 // here; otherwise the generated `Json` type is returned. Feature modules add their DTOs here
@@ -152,6 +188,43 @@ export const RPC_RESULT_SCHEMAS = {
   commit_import_chunk: commitChunkResultSchema,
   close_import: importJobSchema,
   list_import_jobs: z.array(importJobSchema),
+
+  // M2 — timetable & lessons
+  list_timetable_versions: z.array(timetableVersionRowSchema),
+  get_timetable_version: timetableVersionSchema,
+  save_timetable_draft: timetableDraftSavedSchema,
+  discard_timetable_draft: timetableDiscardedSchema,
+  activate_timetable: timetableActivatedSchema,
+  copy_timetable: timetableCopiedSchema,
+  generate_lesson_sessions: lessonsGeneratedSchema,
+  get_date_schedule: z.array(scheduleLessonSchema),
+  get_schedule_range: z.array(scheduleDaySchema),
+  update_lesson_session: lessonUpdatedSchema,
+  suggest_substitutes: z.array(substituteSuggestionSchema),
+  assign_substitute: substituteAssignedSchema,
+  remove_substitute: lessonUpdatedSchema,
+  list_substitutions: z.array(substitutionRowSchema),
+  get_teacher_today: teacherTodaySchema,
+
+  // M2 — attendance
+  get_marking_roster: markingRosterSchema,
+  mark_student_attendance: studentMarksSavedSchema,
+  get_attendance_overview: attendanceOverviewSchema,
+  get_student_attendance_summary: attendanceSummarySchema,
+  get_student_attendance_records: z.array(attendanceRecordSchema),
+  get_staff_attendance: staffAttendanceSchema,
+  mark_staff_attendance: staffMarksSavedSchema,
+
+  // M2 — diary & homework
+  get_diary_entry: diaryEntrySchema,
+  save_diary_entry: diarySavedSchema,
+  list_diary_entries: diaryPageSchema,
+  get_student_diary: z.array(studentDiaryItemSchema),
+  save_homework: homeworkSavedSchema,
+  list_homework: homeworkPageSchema,
+  get_homework_roster: homeworkRosterSchema,
+  mark_homework_checks: homeworkChecksSavedSchema,
+  get_student_homework: z.array(studentHomeworkItemSchema),
 } satisfies Record<string, z.ZodType>;
 
 export type RpcWithSchema = keyof typeof RPC_RESULT_SCHEMAS;

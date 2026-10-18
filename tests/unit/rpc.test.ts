@@ -83,7 +83,10 @@ describe('context revision', () => {
 
   it('caller args are passed through alongside the revision', async () => {
     setContext(3);
-    onRpc(() => ({ data: {} }));
+    // a valid (empty) get_teacher_today response: M2 validates its shape
+    onRpc(() => ({
+      data: { date: '2026-10-05', mode: 'daily', lessons: [], class_teacher_sections: [], homework_to_check: [] },
+    }));
     await rpc.getTeacherToday({ p_date: '2026-10-05' });
     expect(rpcCalls[0]).toEqual({ fn: 'get_teacher_today', args: { p_date: '2026-10-05', p_ctx_rev: 3 } });
   });

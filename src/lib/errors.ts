@@ -44,12 +44,19 @@ const SHOW_SERVER_MESSAGE: ReadonlySet<AppErrorCode> = new Set([
 export class AppError extends Error {
   readonly code: AppErrorCode;
   readonly requestId: string;
+  /**
+   * Structured details a hinted server error carries (`private.fail(code, message, details)`), e.g. the
+   * double-booked periods of activate_timetable or the absent/overlap flags of assign_substitute.
+   * Data for the UI to interpret — never shown as text.
+   */
+  readonly details: unknown;
 
-  constructor(code: AppErrorCode, message: string, requestId: string) {
+  constructor(code: AppErrorCode, message: string, requestId: string, details: unknown = null) {
     super(message);
     this.name = 'AppError';
     this.code = code;
     this.requestId = requestId;
+    this.details = details;
   }
 }
 
@@ -99,6 +106,17 @@ interface ErrorLike {
   hint?: unknown;
   message?: unknown;
   name?: unknown;
+  details?: unknown;
+}
+
+/** PostgREST `details` of a hinted error: the JSON `private.fail` put there, or null. */
+function parseDetails(details: unknown): unknown {
+  if (typeof details !== 'string' || details === '') return null;
+  try {
+    return JSON.parse(details) as unknown;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -117,7 +135,7 @@ export function toAppError(err: unknown, requestId: string = newRequestId(), ser
   const code = isServerCode(serverCode) ? serverCode : isServerCode(e.hint) ? e.hint : undefined;
   if (code) {
     const text = SHOW_SERVER_MESSAGE.has(code) && message ? message : SAFE_MESSAGES[code];
-    return new AppError(code, text, requestId);
+    return new AppError(code, text, requestId, parseDetails(e.details));
   }
 
   // PostgREST JWT problems (expired / invalid token) are authentication failures.
