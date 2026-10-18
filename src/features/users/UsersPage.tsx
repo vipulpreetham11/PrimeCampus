@@ -206,7 +206,8 @@ export function UsersPage() {
         )}
       </DataState>
 
-      {creating && <CreateLoginDialog open onOpenChange={setCreating} onIssued={setIssued} />}
+      {/* Stays mounted while closed: an unfinished attempt (typed values + operation id) survives reopening. */}
+      <CreateLoginDialog open={creating} onOpenChange={setCreating} onIssued={setIssued} />
       {adding && <AddRoleDialog open onOpenChange={setAdding} />}
 
       <ConfirmDialog

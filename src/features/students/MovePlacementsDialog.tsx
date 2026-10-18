@@ -12,14 +12,16 @@ import { Textarea } from '@/components/ui/textarea';
 import type { SetupSnapshot } from '@/contracts/setup';
 import type { MovePlacementsResult, StudentListItem } from '@/contracts/students';
 import { schoolToday } from '@/lib/dates';
-import { useOperationId } from '@/lib/operation';
+import { isAppError } from '@/lib/errors';
+import { useOperationTracker } from '@/lib/operation';
 import { handleSaveError } from '@/lib/save-feedback';
 import { useMovePlacements } from './hooks';
 
 /**
  * Batch placement move (brief §4.5): preview first (p_preview = true), show the server's preview,
- * then commit with the SAME operation id. The id is renewed only after a successful commit.
- * Changing any input invalidates the preview.
+ * then commit with the SAME operation id. The id is renewed after a successful commit or a definite
+ * refusal; it is kept after an uncertain failure so retrying the same move resumes it. Changing any
+ * input invalidates the preview and (via the payload) starts a new operation id.
  */
 export function MovePlacementsDialog({
   students,
@@ -35,7 +37,7 @@ export function MovePlacementsDialog({
   onDone: () => void;
 }) {
   const move = useMovePlacements();
-  const { operationId, reset } = useOperationId();
+  const operation = useOperationTracker();
   const [sectionId, setSectionId] = useState('');
   const [effectiveFrom, setEffectiveFrom] = useState(schoolToday());
   const [reason, setReason] = useState('');
@@ -67,22 +69,22 @@ export function MovePlacementsDialog({
 
   const run = async (commit: boolean) => {
     setError(null);
+    const payload = { effectiveFrom, reason: reason.trim(), moves: moves() };
+    // Preview and commit share the id: the preview flag is not part of the payload key.
+    const operationId = operation.idFor(payload);
     try {
-      const res = await move.mutateAsync({
-        operationId,
-        preview: !commit,
-        effectiveFrom,
-        reason: reason.trim(),
-        moves: moves(),
-      });
+      const res = await move.mutateAsync({ operationId, preview: !commit, ...payload });
       if (res.preview) {
         setPreview(res);
       } else {
         toast.success(`${res.moved} student${res.moved === 1 ? '' : 's'} moved.`);
-        reset();
+        operation.succeeded();
         onDone();
       }
     } catch (e) {
+      operation.failed(e);
+      // e.g. "operation id already used for different content": the id was renewed; preview again.
+      if (isAppError(e) && e.code === 'DUPLICATE') setPreview(null);
       setError(handleSaveError(e));
     }
   };

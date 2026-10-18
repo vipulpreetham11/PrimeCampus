@@ -20,8 +20,7 @@ import type { LeadDetail } from '@/contracts/admissions';
 import type { SetupSnapshot } from '@/contracts/setup';
 import { RELATIONSHIPS, SOCIAL_CATEGORIES, type GuardianSearchItem } from '@/contracts/students';
 import { compareIsoDates, schoolToday } from '@/lib/dates';
-import { isAppError } from '@/lib/errors';
-import { useOperationId } from '@/lib/operation';
+import { useOperationTracker } from '@/lib/operation';
 import { handleSaveError } from '@/lib/save-feedback';
 import { useCan } from '@/lib/scope';
 import { useSetupSnapshot } from '@/features/setup/hooks';
@@ -80,7 +79,7 @@ function AdmitForm({ snapshot, lead }: { snapshot: SetupSnapshot; lead: LeadDeta
   const navigate = useNavigate();
   const admit = useAdmitStudent();
   const canSensitive = useCan('students.sensitive');
-  const { operationId, reset } = useOperationId(); // one id per form; reused on retry
+  const operation = useOperationTracker(); // one id per admission; kept for an identical retry
   const [error, setError] = useState<unknown>(null);
   const [touched, setTouched] = useState(false);
   const year = snapshot.academic_years.find((y) => y.id === snapshot.selected_year_id);
@@ -162,32 +161,33 @@ function AdmitForm({ snapshot, lead }: { snapshot: SetupSnapshot; lead: LeadDeta
             }).filter(([, x]) => x !== null),
           )
         : {};
+      const payload = {
+        leadId: lead?.lead.id ?? null,
+        student: { ...studentPayload(v), admission_no: v.admission_no.trim() },
+        guardians: guardians.map((g) => ({
+          ...(g.existing
+            ? { guardian_id: g.existing.guardian_id }
+            : { full_name: g.full_name.trim(), ...(g.phone.trim() ? { phone: g.phone.trim() } : {}) }),
+          relationship: g.relationship,
+          is_primary: g.is_primary,
+          portal_access: g.portal_access,
+        })),
+        sectionId: v.section_id,
+        joinedOn: v.joined_on,
+        rollNo: v.roll_no.trim() || null,
+        sensitive: Object.keys(sensitive).length > 0 ? sensitive : null,
+      };
+      // Same id for an identical retry after an uncertain failure (cannot admit twice); new id if edited.
+      const operationId = operation.idFor(payload);
       try {
-        const res = await admit.mutateAsync({
-          operationId,
-          leadId: lead?.lead.id ?? null,
-          student: { ...studentPayload(v), admission_no: v.admission_no.trim() },
-          guardians: guardians.map((g) => ({
-            ...(g.existing
-              ? { guardian_id: g.existing.guardian_id }
-              : { full_name: g.full_name.trim(), ...(g.phone.trim() ? { phone: g.phone.trim() } : {}) }),
-            relationship: g.relationship,
-            is_primary: g.is_primary,
-            portal_access: g.portal_access,
-          })),
-          sectionId: v.section_id,
-          joinedOn: v.joined_on,
-          rollNo: v.roll_no.trim() || null,
-          sensitive: Object.keys(sensitive).length > 0 ? sensitive : null,
-        });
-        reset();
+        const res = await admit.mutateAsync({ operationId, ...payload });
+        operation.succeeded();
         toast.success(
           'replayed' in res && res.replayed ? 'This enquiry was already admitted.' : 'Student admitted.',
         );
         navigate(`/students/${res.student_id}`, { replace: true });
       } catch (e) {
-        // Keep the same operation id after a network failure so a retry cannot admit twice.
-        if (isAppError(e) && e.code !== 'NETWORK' && e.code !== 'TEMPORARILY_UNAVAILABLE') reset();
+        operation.failed(e);
         setError(handleSaveError(e));
       }
     },

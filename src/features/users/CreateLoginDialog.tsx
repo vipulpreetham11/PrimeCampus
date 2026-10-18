@@ -12,8 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { roleLabel, type Role } from '@/contracts/roles';
 import type { GuardianSearchItem } from '@/contracts/students';
 import { DUTY_ROLES, GRANTABLE_ROLES } from '@/contracts/users';
-import { isAppError } from '@/lib/errors';
-import { useOperationId } from '@/lib/operation';
+import { useOperationTracker } from '@/lib/operation';
 import { useSessionSelector } from '@/lib/session/store';
 import { GuardianPicker } from '@/features/students/GuardianPicker';
 import { useStaffList } from '@/features/staff/hooks';
@@ -36,10 +35,11 @@ const schema = z.object({
 type Values = z.infer<typeof schema>;
 
 /**
- * Create a login (Edge `provision`). One operation id per dialog: a retry after a lost response
- * reuses it (the server resumes instead of creating a second identity); it is renewed only after
- * success or a definite refusal. The temporary password goes straight to `onIssued` and is never
- * cached or logged.
+ * Create a login (Edge `provision`). The caller keeps this dialog mounted while closed, so the typed
+ * values and the operation id survive closing and reopening: a retry after a lost response resends the
+ * same payload with the same id (the server resumes instead of creating a second identity). The id is
+ * renewed only after success, a definite refusal, or an edit of the form. The temporary password goes
+ * straight to `onIssued` and is never cached or logged.
  */
 export function CreateLoginDialog({
   open,
@@ -51,9 +51,9 @@ export function CreateLoginDialog({
   onIssued: (p: IssuedPassword) => void;
 }) {
   const schoolId = useSessionSelector((s) => s.context?.school_id ?? '');
-  const { operationId, reset } = useOperationId();
+  const operation = useOperationTracker();
   const refresh = useRefreshAfterLoginChange();
-  const staff = useStaffList(null, false);
+  const staff = useStaffList(null, false, open);
   const [guardians, setGuardians] = useState<GuardianSearchItem[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
@@ -84,14 +84,9 @@ export function CreateLoginDialog({
         ...(needsStaff && v.staff_id !== NO_STAFF ? { staff_id: v.staff_id } : {}),
         ...(isParent && guardians.length > 0 ? { guardian_ids: guardians.map((g) => g.guardian_id) } : {}),
       };
-      const issued = await provisionLogin({
-        operationId,
-        username: v.username,
-        displayName: v.display_name,
-        memberships,
-        links,
-      });
-      reset();
+      const payload = { username: v.username, displayName: v.display_name, memberships, links };
+      const issued = await provisionLogin({ operationId: operation.idFor(payload), ...payload });
+      operation.succeeded();
       refresh();
       if (issued) {
         form.reset();
@@ -104,8 +99,8 @@ export function CreateLoginDialog({
         );
       }
     } catch (e) {
-      // A definite refusal ends this attempt; a network failure keeps the id so a retry resumes.
-      if (isAppError(e) && e.code !== 'NETWORK' && e.code !== 'TEMPORARILY_UNAVAILABLE') reset();
+      // A definite refusal ends this attempt; an uncertain failure keeps the id so a retry resumes.
+      operation.failed(e);
       setError(e);
     } finally {
       setBusy(false);
