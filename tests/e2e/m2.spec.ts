@@ -493,9 +493,9 @@ test('5. Teacher writes the diary and sets homework from the lesson; checks home
   const first = rows.nth(0);
   await expect(first).toHaveAttribute('data-state', 'unmarked');
   await expect(first.getByText('Unchecked').first()).toBeVisible();
-  await first.getByRole('radio', { name: 'Completed' }).click();
+  await first.getByRole('radio', { name: 'Completed', exact: true }).click();
   await first.getByRole('radio', { name: 'Correction required' }).click();
-  await rows.nth(1).getByRole('radio', { name: 'Completed' }).click();
+  await rows.nth(1).getByRole('radio', { name: 'Completed', exact: true }).click();
   await rows.nth(2).getByRole('radio', { name: 'Not completed' }).click();
   await noHorizontalScroll(page);
   await shot(page, '375-homework-roster');
