@@ -27,3 +27,11 @@ if (!Element.prototype.hasPointerCapture) {
   Element.prototype.releasePointerCapture = () => undefined;
 }
 if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => undefined;
+// Radix Checkbox/Switch measure themselves (useSize).
+if (!('ResizeObserver' in globalThis)) {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}

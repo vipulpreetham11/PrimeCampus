@@ -4,6 +4,7 @@ import {
   SERVER_ERROR_CODES,
   isTransient,
   reportGlobalError,
+  routeId,
   setGlobalErrorHandler,
   toAppError,
 } from '@/lib/errors';
@@ -46,14 +47,32 @@ describe('toAppError — PostgREST hint mapping (CLAUDE.md rule 3)', () => {
     ['23505', 'DUPLICATE'],
     ['23P01', 'VALIDATION_ERROR'],
     ['23514', 'VALIDATION_ERROR'],
-    ['23502', 'VALIDATION_ERROR'],
-    ['23503', 'VALIDATION_ERROR'],
-    ['22P02', 'VALIDATION_ERROR'],
-  ])('maps raw constraint SQLSTATE %s to %s with a fixed safe message', (sqlState, code) => {
+  ])('maps user-fixable constraint SQLSTATE %s to %s with a fixed safe message', (sqlState, code) => {
     const raw = 'duplicate key value violates unique constraint "students_admission_no_uq"';
     const e = toAppError({ code: sqlState, message: raw, hint: null, details: 'Key (x)=(y)' });
     expect(e.code).toBe(code);
     expect(e.message).not.toMatch(/constraint|Key \(|students_/);
+  });
+
+  it.each(['23502', '23503', '22P02', '22001', '22007', '22008'])(
+    'treats SQLSTATE %s (a client bug, not a user mistake) as UNKNOWN with a request id',
+    (sqlState) => {
+      const e = toAppError({
+        code: sqlState,
+        message: 'invalid input syntax for type uuid: "abc"',
+        hint: null,
+      });
+      expect(e.code).toBe('UNKNOWN');
+      expect(e.message).toBe('Something went wrong.');
+      expect(e.message).not.toMatch(/format|syntax|uuid/i);
+      expect(e.requestId).toMatch(/^[0-9a-f-]{36}$/);
+    },
+  );
+
+  it('a malformed id from the URL is NOT_FOUND and never reaches the server', () => {
+    expect(() => routeId('abc')).toThrow(expect.objectContaining({ code: 'NOT_FOUND' }));
+    expect(() => routeId(undefined)).toThrow(expect.objectContaining({ code: 'NOT_FOUND' }));
+    expect(routeId('33eb3da2-a35a-459e-860d-9c04b4f94710')).toBe('33eb3da2-a35a-459e-860d-9c04b4f94710');
   });
 
   it('ignores hints that are not part of the contract', () => {
