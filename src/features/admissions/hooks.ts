@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-query';
 import type { Json } from '@/generated/database.types';
 import { admitStudent, getFollowupsDue, getLead, listLeads, recordLeadFollowup, saveLead } from '@/lib/rpc';
+import { routeId } from '@/lib/errors';
 import { useScopedKey } from '@/lib/scope';
 
 // Admissions (brief §5, capability admissions.manage). Enquiries are keyset-paged on
@@ -49,7 +50,7 @@ export function useLead(leadId: string | undefined) {
   const key = useScopedKey();
   return useQuery({
     queryKey: key('lead', leadId),
-    queryFn: ({ signal }) => getLead({ p_lead_id: leadId! }, { signal }),
+    queryFn: ({ signal }) => getLead({ p_lead_id: routeId(leadId) }, { signal }),
     enabled: !!leadId,
     staleTime: 30_000,
   });

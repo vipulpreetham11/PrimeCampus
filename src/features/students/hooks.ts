@@ -16,6 +16,7 @@ import {
   searchGuardians,
   updateStudent,
 } from '@/lib/rpc';
+import { routeId } from '@/lib/errors';
 import { useScopedKey } from '@/lib/scope';
 
 // Students & guardians (brief §4). The directory uses the server's keyset cursor (after_name,
@@ -56,7 +57,7 @@ export function useStudentProfile(studentId: string | undefined) {
   const key = useScopedKey();
   return useQuery({
     queryKey: key('student', studentId),
-    queryFn: ({ signal }) => getStudentProfile({ p_student_id: studentId! }, { signal }),
+    queryFn: ({ signal }) => getStudentProfile({ p_student_id: routeId(studentId) }, { signal }),
     enabled: !!studentId,
     staleTime: 30_000,
   });

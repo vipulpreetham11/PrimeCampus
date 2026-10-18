@@ -69,6 +69,9 @@ function isServerCode(v: unknown): v is ServerErrorCode {
   return typeof v === 'string' && (SERVER_ERROR_CODES as readonly string[]).includes(v);
 }
 
+// Constraint violations a user can cause and fix (duplicate value, overlapping dates, a rule check).
+// Other raw SQLSTATEs (not-null, foreign key, bad cast, too long, bad date) mean the client sent
+// something it should not have — our bug — so they stay UNKNOWN: "Something went wrong" + request id.
 const CONSTRAINT_MESSAGES: Record<string, [AppErrorCode, string]> = {
   '23505': [
     'DUPLICATE',
@@ -76,13 +79,18 @@ const CONSTRAINT_MESSAGES: Record<string, [AppErrorCode, string]> = {
   ],
   '23P01': ['VALIDATION_ERROR', 'These dates overlap an existing record. Choose dates that do not overlap.'],
   '23514': ['VALIDATION_ERROR', 'Some values are not allowed. Check the highlighted rules and try again.'],
-  '23502': ['VALIDATION_ERROR', 'A required value is missing.'],
-  '23503': ['VALIDATION_ERROR', 'This refers to something that does not exist in this school.'],
-  '22P02': ['VALIDATION_ERROR', 'One of the values has the wrong format.'],
-  '22007': ['VALIDATION_ERROR', 'One of the dates or times has the wrong format.'],
-  '22008': ['VALIDATION_ERROR', 'One of the dates or times is out of range.'],
-  '22001': ['VALIDATION_ERROR', 'One of the values is too long.'],
 };
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * An id taken from the URL. A malformed one (e.g. /students/abc) is reported as NOT_FOUND and never
+ * sent to the server, where it would fail as a raw cast error.
+ */
+export function routeId(id: string | undefined): string {
+  if (!id || !UUID_PATTERN.test(id)) throw new AppError('NOT_FOUND', SAFE_MESSAGES.NOT_FOUND, newRequestId());
+  return id;
+}
 
 const NETWORK_PATTERN = /failed to fetch|networkerror|network request failed|load failed|fetch failed/i;
 
