@@ -88,6 +88,14 @@ export type Database = {
         }
         Returns: Json
       }
+      close_import: {
+        Args: { p_ctx_rev: number; p_job_id: string }
+        Returns: Json
+      }
+      commit_import_chunk: {
+        Args: { p_ctx_rev: number; p_job_id: string; p_limit?: number }
+        Returns: Json
+      }
       copy_timetable: {
         Args: {
           p_ctx_rev: number
@@ -177,6 +185,20 @@ export type Database = {
       }
       get_homework_roster: {
         Args: { p_assignment_id: string; p_ctx_rev: number }
+        Returns: Json
+      }
+      get_import_job: {
+        Args: {
+          p_after_row_no?: number
+          p_ctx_rev: number
+          p_filter?: string
+          p_job_id: string
+          p_limit?: number
+        }
+        Returns: Json
+      }
+      get_import_template: {
+        Args: { p_ctx_rev: number; p_dataset: string }
         Returns: Json
       }
       get_lead: {
@@ -302,6 +324,10 @@ export type Database = {
           p_class_id?: string
           p_ctx_rev: number
         }
+        Returns: Json
+      }
+      list_import_jobs: {
+        Args: { p_ctx_rev: number; p_limit?: number }
         Returns: Json
       }
       list_leads: {
@@ -840,6 +866,15 @@ export type Database = {
         Args: { p_academic_year_id: string; p_ctx_rev: number }
         Returns: Json
       }
+      set_import_row_removed: {
+        Args: {
+          p_ctx_rev: number
+          p_job_id: string
+          p_removed: boolean
+          p_row_no: number
+        }
+        Returns: Json
+      }
       set_optional_fee: {
         Args: {
           p_academic_year_id: string
@@ -847,6 +882,22 @@ export type Database = {
           p_enabled: boolean
           p_fee_head_id: string
           p_student_id: string
+        }
+        Returns: Json
+      }
+      stage_import_rows: {
+        Args: { p_ctx_rev: number; p_job_id: string; p_rows: Json }
+        Returns: Json
+      }
+      start_import: {
+        Args: {
+          p_academic_year_id: string
+          p_ctx_rev: number
+          p_dataset: string
+          p_file_name: string
+          p_mapping?: Json
+          p_operation_id: string
+          p_source_fingerprint: string
         }
         Returns: Json
       }
@@ -903,6 +954,15 @@ export type Database = {
       svc_set_provisioning_auth_user: {
         Args: { p_auth_user_id: string; p_operation_id: string }
         Returns: undefined
+      }
+      update_import_row: {
+        Args: {
+          p_ctx_rev: number
+          p_data: Json
+          p_job_id: string
+          p_row_no: number
+        }
+        Returns: Json
       }
       update_lesson_session: {
         Args: {

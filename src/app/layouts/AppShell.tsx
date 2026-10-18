@@ -5,6 +5,7 @@ import {
   Briefcase,
   CalendarDays,
   ClipboardList,
+  FileUp,
   GraduationCap,
   KeyRound,
   LayoutDashboard,
@@ -42,6 +43,7 @@ const ICONS: Record<NavIcon, LucideIcon> = {
   admissions: ClipboardList,
   staff: Briefcase,
   users: Users,
+  imports: FileUp,
   operator: School,
 };
 
