@@ -63,6 +63,15 @@ import {
   leadPageSchema,
   leadSavedSchema,
 } from './admissions';
+import {
+  commitChunkResultSchema,
+  importJobPageSchema,
+  importJobSchema,
+  importTemplateSchema,
+  rowChangeResultSchema,
+  stageResultSchema,
+  startImportResultSchema,
+} from './imports';
 
 // Response schemas per RPC. The RPC layer validates a response when its function is listed
 // here; otherwise the generated `Json` type is returned. Feature modules add their DTOs here
@@ -132,6 +141,17 @@ export const RPC_RESULT_SCHEMAS = {
   record_lead_followup: followupSavedSchema,
   get_followups_due: z.array(followupDueSchema),
   admit_student: admitResultSchema,
+
+  // M1b — spreadsheet imports
+  get_import_template: importTemplateSchema,
+  start_import: startImportResultSchema,
+  stage_import_rows: stageResultSchema,
+  get_import_job: importJobPageSchema,
+  update_import_row: rowChangeResultSchema,
+  set_import_row_removed: rowChangeResultSchema,
+  commit_import_chunk: commitChunkResultSchema,
+  close_import: importJobSchema,
+  list_import_jobs: z.array(importJobSchema),
 } satisfies Record<string, z.ZodType>;
 
 export type RpcWithSchema = keyof typeof RPC_RESULT_SCHEMAS;

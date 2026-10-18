@@ -138,6 +138,24 @@ const userRoutes: RouteObject = guarded(
   ],
 );
 
+const importRoutes: RouteObject = guarded(
+  ['imports.manage'],
+  [
+    {
+      path: '/imports',
+      lazy: () => import('@/features/imports/ImportsPage').then((m) => ({ Component: m.ImportsPage })),
+    },
+    {
+      path: '/imports/new',
+      lazy: () => import('@/features/imports/NewImportPage').then((m) => ({ Component: m.NewImportPage })),
+    },
+    {
+      path: '/imports/:jobId',
+      lazy: () => import('@/features/imports/ImportJobPage').then((m) => ({ Component: m.ImportJobPage })),
+    },
+  ],
+);
+
 export const router = createBrowserRouter([
   {
     element: <RootLayout />,
@@ -171,6 +189,7 @@ export const router = createBrowserRouter([
           studentRoutes,
           admissionRoutes,
           userRoutes,
+          importRoutes,
           {
             path: '/operator/onboarding',
             lazy: () =>

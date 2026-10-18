@@ -7,8 +7,11 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: { alias: { '@': path.resolve(import.meta.dirname, './src') } },
-  // TRD §19 budget is ≤300 KB *compressed* initial JS; Vite's warning measures raw size.
-  build: { sourcemap: false, target: 'es2022', chunkSizeWarningLimit: 900 },
+  // TRD §19 budget is ≤300 KB *compressed* initial JS (enforced by `npm run check:bundle`); Vite's
+  // warning measures raw size. The lazy exceljs chunk (imports only) is ~930 KB raw.
+  build: { sourcemap: false, target: 'es2022', chunkSizeWarningLimit: 1000 },
+  // The import parser worker lazy-loads exceljs/papaparse, which needs an ES module worker.
+  worker: { format: 'es' },
   test: {
     environment: 'jsdom',
     globals: true,

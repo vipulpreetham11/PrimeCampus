@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { ProfileGuardian, StudentProfile } from '@/contracts/students';
-import { formatDate } from '@/lib/dates';
+import { addDays, formatDate } from '@/lib/dates';
 import { LinkLoginCard } from '@/features/users/LinkLoginCard';
 import {
   AddGuardianDialog,
@@ -190,6 +190,7 @@ export function StudentProfilePage() {
                   {data.placements.length === 0 ? (
                     <p className="text-muted-foreground text-sm">No placement recorded.</p>
                   ) : (
+                    // `to` is the exclusive effective_to: the last day in the section is the day before.
                     <ol className="space-y-1 text-sm" data-testid="placements">
                       {data.placements.map((p) => (
                         <li
@@ -201,7 +202,7 @@ export function StudentProfilePage() {
                             {p.roll_no ? ` · Roll ${p.roll_no}` : ''}
                           </span>
                           <span className="text-muted-foreground">
-                            {formatDate(p.from)} – {p.to ? formatDate(p.to) : 'now'}
+                            {formatDate(p.from)} – {p.to ? formatDate(addDays(p.to, -1)) : 'now'}
                             {p.reason ? ` · ${p.reason}` : ''}
                           </span>
                         </li>
