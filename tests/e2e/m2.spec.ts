@@ -100,9 +100,10 @@ test.beforeAll(async () => {
   D.periodDate = working.filter((d) => d <= TODAY && modeOn(d) === 'period').at(-1) ?? null;
   if (modeOn(D.past) !== 'daily') throw new Error(`test 3 needs a day-wise date; ${D.past} is not`);
 
-  const sections = await op.school<{ sections: { id: string; class_id: string; name: string }[]; classes: { id: string; name: string }[] }>(
-    'get_setup_snapshot',
-  );
+  const sections = await op.school<{
+    sections: { id: string; class_id: string; name: string }[];
+    classes: { id: string; name: string }[];
+  }>('get_setup_snapshot');
   const cls = new Map(sections.classes.map((c) => [c.id, c.name]));
   for (const s of sections.sections) ids[`${cls.get(s.class_id)} ${s.name}`] = s.id;
   const students = await op.school<{ items: { student_id: string; name: string }[] }>('list_students', {
@@ -154,10 +155,6 @@ async function choose(scope: Page | Locator, label: string | RegExp, option: str
   const page = 'page' in scope ? scope.page() : scope;
   await scope.getByRole('combobox', { name: label }).click();
   await page.getByRole('option', { name: option, exact: true }).click();
-}
-
-async function setDate(page: Page, label: string, iso: string) {
-  await page.getByLabel(label, { exact: true }).fill(iso);
 }
 
 /** Open the timetable versions of a section and start a blank draft (start date, bell schedule). */
@@ -219,7 +216,9 @@ async function noHorizontalScroll(page: Page) {
 
 async function shot(page: Page, name: string) {
   await page.evaluate(() => window.scrollTo(0, 0));
-  await page.locator('[data-sonner-toaster]').evaluateAll((els) => els.forEach((e) => ((e as HTMLElement).style.display = 'none')));
+  await page
+    .locator('[data-sonner-toaster]')
+    .evaluateAll((els) => els.forEach((e) => ((e as HTMLElement).style.display = 'none')));
   await page.screenshot({ path: `${SCREENS}/${name}.png`, fullPage: true });
 }
 
@@ -234,13 +233,18 @@ test('1. Admin builds a timetable with a teacher clash (shown, fixed), activates
   await page.goto(`/timetable?section=${ids[SECTION_B]}`);
   const versions = page.getByRole('list', { name: 'Timetable versions' });
   await expect(versions.or(page.getByText('No timetable yet'))).toBeVisible({ timeout: 30_000 });
-  const hasActiveB = await versions.getByText('Active', { exact: true }).isVisible().catch(() => false);
+  const hasActiveB = await versions
+    .getByText('Active', { exact: true })
+    .isVisible()
+    .catch(() => false);
   if (!hasActiveB) {
     await newBlankDraft(page, SECTION_B, D.start);
     await setCell(page, 'Monday', 'Period 3', 'Science', 'Meera Rao');
     await saveDraft(page);
     await page.getByRole('button', { name: 'Activate' }).click();
-    await expect(modal(page).getByText('Update lessons for the coming weeks')).toBeVisible({ timeout: 30_000 });
+    await expect(modal(page).getByText('Update lessons for the coming weeks')).toBeVisible({
+      timeout: 30_000,
+    });
     await modal(page).getByRole('button', { name: 'Close' }).last().click();
   }
 
@@ -256,7 +260,9 @@ test('1. Admin builds a timetable with a teacher clash (shown, fixed), activates
   const clashCell = page
     .getByTestId('timetable-grid')
     .getByRole('button', { name: /^Monday, Period 3:.*teacher clash/ });
-  await expect(clashCell.getByTestId('cell-clash')).toContainText(`Clash: Meera Rao also teaches ${SECTION_B} then`);
+  await expect(clashCell.getByTestId('cell-clash')).toContainText(
+    `Clash: Meera Rao also teaches ${SECTION_B} then`,
+  );
   await expect(page.getByTestId('conflict-count')).toHaveText('1');
   await expect(page.getByRole('button', { name: 'Activate' })).toBeDisabled();
   await expect(page.getByText(/Activation is blocked: 1 teacher clash/)).toBeVisible();
@@ -278,7 +284,9 @@ test('1. Admin builds a timetable with a teacher clash (shown, fixed), activates
   await page.reload();
   await expect(page.getByTestId('timetable-grid')).toBeVisible();
   await noHorizontalScroll(page);
-  const gridScrolls = await page.getByTestId('timetable-grid').evaluate((el) => el.scrollWidth > el.clientWidth);
+  const gridScrolls = await page
+    .getByTestId('timetable-grid')
+    .evaluate((el) => el.scrollWidth > el.clientWidth);
   expect(gridScrolls).toBe(true);
   await shot(page, '375-timetable-grid');
 
@@ -294,7 +302,10 @@ test('1. Admin builds a timetable with a teacher clash (shown, fixed), activates
 test('2. Teacher "Today": period attendance (mark all present + 2 exceptions); a second tab gets a conflict', async ({
   browser,
 }) => {
-  test.skip(D.periodDate === null, 'No period-mode working day on or before today in Demo School (it is day-wise on every date).');
+  test.skip(
+    D.periodDate === null,
+    'No period-mode working day on or before today in Demo School (it is day-wise on every date).',
+  );
   test.setTimeout(240_000);
   const date = D.periodDate!;
   const { context, page } = await asTeacher(browser);
@@ -326,12 +337,16 @@ test('2. Teacher "Today": period attendance (mark all present + 2 exceptions); a
 });
 
 // ------------------------------------------------------------------ 3. daily attendance
-test('3. Day-wise date: the class teacher marks the day register, including a half day', async ({ browser }) => {
+test('3. Day-wise date: the class teacher marks the day register, including a half day', async ({
+  browser,
+}) => {
   test.setTimeout(240_000);
   const { context, page } = await asTeacher(browser, PHONE);
   await page.goto(`/dashboard?date=${D.past}`);
   await expect(page.getByTestId('teacher-today')).toBeVisible();
-  await expect(page.getByText('Day-wise attendance: class teachers mark one register for the day.')).toBeVisible();
+  await expect(
+    page.getByText('Day-wise attendance: class teachers mark one register for the day.'),
+  ).toBeVisible();
   // the teacher's lessons of the day are listed (Period 2 English is Ravi Kumar's)
   await expect(page.getByTestId('today-lesson').filter({ hasText: 'English' }).first()).toBeVisible();
   await noHorizontalScroll(page);
@@ -342,17 +357,20 @@ test('3. Day-wise date: the class teacher marks the day register, including a ha
   await expect(page.getByTestId('marking-roster')).toBeVisible();
   const fill = page.getByRole('button', { name: /^Mark (all|remaining \d+) present$/ });
   if (await fill.isEnabled()) await fill.click();
-  // Aarav (row of the parent test) and one more student: a half day and an absence every run
-  const aarav = page.getByTestId('roster-row').filter({ hasText: 'Aarav Sharma' });
-  const other = page.getByTestId('roster-row').filter({ hasNotText: 'Aarav Sharma' }).first();
-  const aaravHalf = (await aarav.getByRole('radio', { name: 'Half day' }).getAttribute('aria-checked')) === 'true';
-  await aarav.getByRole('radio', { name: aaravHalf ? 'Absent' : 'Half day' }).click();
-  await other.getByRole('radio', { name: aaravHalf ? 'Half day' : 'Absent' }).click();
+  // two students get a half day and an absence every run (alternating, so each run really saves)
+  const first = page.getByTestId('roster-row').nth(0);
+  const second = page.getByTestId('roster-row').nth(1);
+  const firstHalf =
+    (await first.getByRole('radio', { name: 'Half day' }).getAttribute('aria-checked')) === 'true';
+  await first.getByRole('radio', { name: firstHalf ? 'Absent' : 'Half day' }).click();
+  await second.getByRole('radio', { name: firstHalf ? 'Half day' : 'Absent' }).click();
   await noHorizontalScroll(page);
   await shot(page, '375-marking-roster');
   await page.getByRole('button', { name: /Save attendance/ }).click();
   await expect(page.getByText('Saved.')).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByTestId('roster-row').filter({ has: page.locator('[data-state="changed"]') })).toHaveCount(0);
+  await expect(
+    page.getByTestId('roster-row').filter({ has: page.locator('[data-state="changed"]') }),
+  ).toHaveCount(0);
   const summary = await page.getByTestId('roster-summary').textContent();
   expect(summary).toMatch(/^(\d+) of \1 marked$/);
   await context.close();
@@ -405,7 +423,10 @@ test('4. Admin marks a teacher absent → the day view flags it → substitute a
   // the substitute (demo.teacher = Ravi Kumar) sees the lesson in Today
   const t = await asTeacher(browser);
   await t.page.goto(`/dashboard?date=${D.past}`);
-  const sub = t.page.getByTestId('today-lesson').filter({ hasText: 'Mathematics' }).filter({ hasText: 'Substitution' });
+  const sub = t.page
+    .getByTestId('today-lesson')
+    .filter({ hasText: 'Mathematics' })
+    .filter({ hasText: 'Substitution' });
   await expect(sub).toBeVisible({ timeout: 30_000 });
   await sub.getByRole('link', { name: 'Diary & homework' }).click();
   await t.page.getByRole('link', { name: 'Attendance register' }).click();
@@ -415,7 +436,9 @@ test('4. Admin marks a teacher absent → the day view flags it → substitute a
   await t.context.close();
 });
 
-test('8. Staff attendance: Teacher has no access (UI) and gets FORBIDDEN from the server', async ({ browser }) => {
+test('8. Staff attendance: Teacher has no access (UI) and gets FORBIDDEN from the server', async ({
+  browser,
+}) => {
   const t = await asTeacher(browser);
   await expect(t.page.getByRole('link', { name: 'Staff attendance' })).toHaveCount(0);
   await t.page.goto(`/staff-attendance?date=${D.past}`);
@@ -441,7 +464,11 @@ test('5. Teacher writes the diary and sets homework from the lesson; checks home
   test.setTimeout(300_000);
   const { context, page } = await asTeacher(browser, PHONE);
   await page.goto(`/dashboard?date=${D.past}`);
-  const lesson = page.getByTestId('today-lesson').filter({ hasText: 'English' }).filter({ hasNotText: 'Substitution' }).first();
+  const lesson = page
+    .getByTestId('today-lesson')
+    .filter({ hasText: 'English' })
+    .filter({ hasNotText: 'Substitution' })
+    .first();
   await lesson.getByRole('link', { name: 'Diary & homework' }).click();
   await expect(page.getByTestId('lesson-page')).toBeVisible();
 
@@ -463,21 +490,23 @@ test('5. Teacher writes the diary and sets homework from the lesson; checks home
   await expect(page.getByTestId('homework-roster')).toBeVisible();
 
   const rows = page.getByTestId('check-row');
-  const aarav = rows.filter({ hasText: 'Aarav Sharma' });
-  const others = rows.filter({ hasNotText: 'Aarav Sharma' });
-  await expect(aarav).toHaveAttribute('data-state', 'unmarked');
-  await expect(aarav.getByText('Unchecked').first()).toBeVisible();
-  await aarav.getByRole('radio', { name: 'Completed' }).click();
-  await aarav.getByRole('radio', { name: 'Correction required' }).click();
-  await others.nth(0).getByRole('radio', { name: 'Completed' }).click();
-  await others.nth(1).getByRole('radio', { name: 'Not completed' }).click();
+  const first = rows.nth(0);
+  await expect(first).toHaveAttribute('data-state', 'unmarked');
+  await expect(first.getByText('Unchecked').first()).toBeVisible();
+  await first.getByRole('radio', { name: 'Completed' }).click();
+  await first.getByRole('radio', { name: 'Correction required' }).click();
+  await rows.nth(1).getByRole('radio', { name: 'Completed' }).click();
+  await rows.nth(2).getByRole('radio', { name: 'Not completed' }).click();
   await noHorizontalScroll(page);
   await shot(page, '375-homework-roster');
   await page.getByRole('button', { name: /Save checks/ }).click();
   await expect(page.getByText('Saved.')).toBeVisible({ timeout: 30_000 });
-  await expect(aarav).toHaveAttribute('data-state', 'marked');
+  await expect(first).toHaveAttribute('data-state', 'marked');
+  await expect(first).toContainText('Completed, correction required');
   // everyone else stays Unchecked — never "not completed"
-  const unchecked = await rows.evaluateAll((els) => els.filter((e) => e.getAttribute('data-state') === 'unmarked').length);
+  const unchecked = await rows.evaluateAll(
+    (els) => els.filter((e) => e.getAttribute('data-state') === 'unmarked').length,
+  );
   const total = await rows.count();
   expect(unchecked).toBe(total - 3);
   await expect(page.getByTestId('check-summary')).toContainText(`3 of ${total} checked`);
@@ -540,37 +569,40 @@ test("7. Parent sees the child's week timetable, attendance, diary note and home
   await page.getByRole('button', { name: /Aarav Sharma/ }).click();
   await expect(page.getByTestId('dashboard-parent')).toBeVisible({ timeout: 30_000 });
   await expectDemoSchool(page);
-  await expect(page.getByTestId('context-summary').filter({ visible: true }).first()).toContainText('Aarav Sharma');
-  const home = page.getByTestId('child-home');
-  // homework state from test 5
-  await expect(home.getByTestId('child-homework').filter({ hasText: RUN }).first()).toBeVisible({ timeout: 30_000 });
-  await expect(home.getByTestId('child-homework').filter({ hasText: `Write 5 sentences with the new words — ${RUN}` })).toContainText(
-    'Correction required',
+  await expect(page.getByTestId('context-summary').filter({ visible: true }).first()).toContainText(
+    'Aarav Sharma',
   );
-  // diary note from test 5 (the week's diary card)
-  await expect(home.getByTestId('child-diary-note').filter({ hasText: RUN })).toBeVisible();
-  // attendance summary and records
-  await expect(home.getByTestId('attendance-summary')).toBeVisible();
-  // week timetable (server-scoped to the child's section)
-  await expect(home.getByTestId('week-view').getByTestId('lesson-card').first()).toBeVisible();
+  const home = page.getByTestId('child-home');
+  // Aarav (like every demo student admitted in M1) joined on 18 Oct 2026, a Sunday: no school day
+  // with him enrolled has happened yet, so attendance and diary are correctly empty (not "0%").
+  await expect(home.getByText('No attendance was expected yet this year.')).toBeVisible({ timeout: 30_000 });
+  await expect(home.getByText('No diary notes in this period')).toBeVisible();
+  // homework set in test 6 on FUT's lesson: shown as "Not checked yet" (never "not completed")
+  const hw = home.getByTestId('child-homework').filter({ hasText: `Bring the reading log — ${RUN}` });
+  await expect(hw).toBeVisible();
+  await expect(hw).toContainText('Not checked yet');
+  await expect(hw).toContainText('Ravi Kumar');
   await noHorizontalScroll(page);
   await shot(page, '375-parent-child-home');
 
-  await page.goto('/child/attendance');
-  const pastRecord = page.getByTestId('attendance-record').filter({ hasText: new RegExp(`\\b${Number(D.past.slice(8))} `) }).first();
-  await expect(pastRecord).toContainText(/Half day|Absent/);
+  // the week timetable of the week FUT is in (server-scoped to the child's section)
   await page.goto('/child/timetable');
-  await expect(page.getByTestId('week-view')).toContainText('Mathematics');
+  await page.getByRole('button', { name: 'Next week' }).click();
+  const week = page.getByTestId('week-view');
+  await expect(week.getByTestId('lesson-card').first()).toBeVisible({ timeout: 30_000 });
+  await expect(week).toContainText('Mathematics');
+  await expect(week).toContainText('English');
+  await page.goto('/child/attendance');
+  await expect(page.getByText('No attendance was expected yet this year.')).toBeVisible({ timeout: 30_000 });
 
   // the other child's data: no route takes a child id, staff routes are closed, the server refuses
   await page.goto(`/students/${ids.anaya}`);
   await expect(page.getByText("You don't have access to this page")).toBeVisible();
   await context.close();
   const api = await ApiSession.signIn('demo.parent', pw.parent!);
-  const b = await api.rpc<{ contexts: { membership_id: string; children?: { student_id: string; name: string }[] }[] }>(
-    'bootstrap_account',
-    { p_device_class: 'desktop', p_user_agent: 'playwright-helper' },
-  );
+  const b = await api.rpc<{
+    contexts: { membership_id: string; children?: { student_id: string; name: string }[] }[];
+  }>('bootstrap_account', { p_device_class: 'desktop', p_user_agent: 'playwright-helper' });
   const c = b.contexts.find((x) => x.children?.some((ch) => ch.name === 'Aarav Sharma'))!;
   const aaravId = c.children!.find((ch) => ch.name === 'Aarav Sharma')!.student_id;
   const sel = await api.rpc<{ context_revision: number }>('select_context', {
@@ -580,16 +612,22 @@ test("7. Parent sees the child's week timetable, attendance, diary note and home
   api.rev = sel.context_revision;
   expect((await api.rpc<{ school_name: string }>('get_context')).school_name).toBe('Demo School');
   for (const fn of ['get_student_homework', 'get_student_diary', 'get_student_attendance_records']) {
-    await expect(api.school(fn, { p_student_id: ids.anaya, p_from: addDays(TODAY, -30), p_to: TODAY })).rejects.toThrow(
-      /FORBIDDEN/,
-    );
+    await expect(
+      api.school(fn, { p_student_id: ids.anaya, p_from: addDays(TODAY, -30), p_to: TODAY }),
+    ).rejects.toThrow(/FORBIDDEN/);
   }
   await api.signOut();
 });
 
 // ------------------------------------------------------------------ 9. network audit
 test('9. Network audit: RPC only, p_ctx_rev on every school RPC, nothing else contacted', async () => {
-  const CONTEXT_FREE = new Set(['bootstrap_account', 'select_context', 'end_app_session', 'get_context', 'record_telemetry']);
+  const CONTEXT_FREE = new Set([
+    'bootstrap_account',
+    'select_context',
+    'end_app_session',
+    'get_context',
+    'record_telemetry',
+  ]);
   expect(seen.length).toBeGreaterThan(50);
   for (const s of seen) {
     const u = new URL(s.url);

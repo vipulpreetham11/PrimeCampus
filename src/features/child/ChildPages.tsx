@@ -53,7 +53,7 @@ export function ChildHomePage() {
             </Link>
           </CardHeader>
           <CardContent>
-            <HomeworkFeed childId={childId} from={addDays(today, -30)} to={today} dueOnly />
+            <HomeworkFeed childId={childId} from={addDays(today, -30)} to={addDays(today, 14)} dueOnly />
           </CardContent>
         </Card>
         <Card>
