@@ -53,7 +53,7 @@ export function datasetLabel(d: string): string {
 
 const JOB_STATUS: Record<string, string> = {
   validating: 'In preview',
-  committing: 'Importing — not closed',
+  committing: 'Open — rows imported',
   completed: 'Closed — all done',
   partially_completed: 'Closed — some rows not imported',
   cancelled: 'Closed — nothing imported',

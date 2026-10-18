@@ -115,7 +115,7 @@ export function RowEditDialog({
             <ErrorText error={error} />
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Close
+                Cancel
               </Button>
               <Button type="submit" disabled={save.isPending}>
                 {save.isPending ? 'Checking…' : 'Save and check'}

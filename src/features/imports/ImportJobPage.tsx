@@ -200,7 +200,7 @@ function ImportPanel({ job }: { job: ImportJob }) {
 
   return (
     <div className="space-y-3">
-      {state.kind !== 'running' && (
+      {state.kind !== 'running' && !allDone(counts) && (
         <div className="space-y-1">
           <Button onClick={() => void run()} disabled={pending === 0 || running}>
             {state.kind === 'ended' &&
