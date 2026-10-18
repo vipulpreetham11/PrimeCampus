@@ -26,11 +26,11 @@ No backend files were changed. The owner fixed the four problems found during pl
 
 | # | Item | Status | How it was verified |
 |---|---|---|---|
-| 1 | `typecheck`, `lint`, `test`, `build`, `check:bundle` pass | ✅ | All five run on the final commit. `test`: 16 files / **239 passed** (190 from M1 + 49 new). |
+| 1 | `typecheck`, `lint`, `test`, `build`, `check:bundle` pass | ✅ | All five run on the final commit. `test`: 16 files / **250 passed** (190 from M1 + 60 for M1b, after the review fixes). |
 | 1b | No `.from(` | ✅ | `grep -rn "\.from(" src tests` (ignoring `Array.from` / `Buffer.from`) finds nothing. E2E test 8 checks every Data API call is `/rest/v1/rpc/<fn>`. |
 | 1c | No browser storage | ✅ | `grep -rn "localStorage\|sessionStorage\|indexedDB" src` finds nothing. E2E test 3 checks, after a students import, that neither `localStorage` nor `sessionStorage` holds a student name or parent mobile, and that IndexedDB has no databases. Parsed rows live only in the wizard's component state (never in the query cache). E2E test 8 checks `record_telemetry` bodies carry no cell values. |
 | 1d | Initial bundle before / after | ✅ | Measured with the new `check:bundle` (gzip of the JS that `dist/index.html` loads + its static imports). **Before (main): 223.9 KB** (7 files). **After: 226.9 KB** (8 files). Budget 300 KB. exceljs (≈256 KB gzip) and papaparse (≈7 KB gzip) are only in lazy chunks; `check:bundle` fails if either appears in the initial set or has no separate chunk. |
-| 2a | Unit: XLSX + CSV parsing | ✅ | `tests/unit/m1b-parse.test.ts`: Excel date cells → `YYYY-MM-DD` under **Asia/Kolkata, UTC and America/Los_Angeles** (and a check that the time-zone switch is real: local getters would give the wrong day in LA); a date-formatted serial (42472) is a date; long numbers (`9876543210`, 15 digits, `1e21`) keep every digit; formula results used; formula without a saved value refuses the file and names the cells (B2, B3); merged cells; rich text / hyperlinks; header on row 2 after a blank row; a fully blank row skipped with row numbers kept; second sheet ignored; corrupt workbook and empty workbook refused. CSV: BOM, header after blank lines, quoted commas and newlines (row numbers still match the spreadsheet), Windows-1252 fallback, unclosed quote refused with its row, header-only file refused. Limits: exactly 10,000 data rows accepted, 10,001 refused; > 5 MB, `.xls` and empty files refused before reading. |
+| 2a | Unit: XLSX + CSV parsing | ✅ | `tests/unit/m1b-parse.test.ts`: Excel date cells → `YYYY-MM-DD` under **Asia/Kolkata, UTC and America/Los_Angeles** (and a check that the time-zone switch is real: local getters would give the wrong day in LA); a date-formatted serial (42472) is a date; long numbers (`9876543210`, 15 digits, `1e21`) keep every digit; formula results used; a formula without a result is a blank cell (review fix 1, incl. a hand-built `=IF(1=1,"","x")` sheet); hidden sheets skipped (review fix 5); merged cells; rich text / hyperlinks; header on row 2 after a blank row; a fully blank row skipped with row numbers kept; second sheet ignored; corrupt workbook and empty workbook refused. CSV: BOM, header after blank lines, quoted commas and newlines (row numbers still match the spreadsheet), Windows-1252 fallback only without multi-byte UTF-8, a Telugu name kept intact next to a stray 0x96 byte with the row named (review fix 2), unclosed quote refused with its row, header-only file refused. Limits: exactly 10,000 data rows accepted, 10,001 refused; > 5 MB, `.xls` and empty files refused before reading. |
 | 2b | Unit: header auto-mapping | ✅ | `m1b-logic.test.ts` › "header auto-mapping": labels or keys, case/space/underscore-insensitive; a repeated header maps once. |
 | 2c | Unit: required-column check | ✅ | "required-column check": lists missing required columns by label; a key chosen twice is flagged. Component test: the start button stays disabled and the message shows. |
 | 2d | Unit: batching ≤ 500 rows | ✅ | "batching": 1,201 rows → 500/500/201 in order; batches also stay ≤ 900 KB of JSON; a single huge row still goes alone. |
@@ -41,7 +41,7 @@ No backend files were changed. The owner fixed the four problems found during pl
 | 3.2 | Playwright: staff (375px) | ✅ live | Test 2, at 375px. Headers in other cases (`EMPLOYEE NO`, `full name`) auto-map. Unknown group → `No active staff group named "No such group <run>". Create it first.`; bad mobile → "Mobile: Use a 10-digit mobile number". Fix the mobile in Edit (row becomes Ready); Remove the other (confirm says removing never deletes a school record) → Import 2 rows → Imported 2, Removed 1 → both staff in the directory, the removed one not. |
 | 3.3 | Playwright: students & parents XLSX | ✅ live | Test 3. XLSX built with real Excel date cells. Bad date (31/02/2019) flagged under Date of birth; an Excel date cell arrived as `2019-05-01`. The bad date is fixed in Edit. Import 4 rows → "3 imported … 1 not imported"; the clash row shows "Not imported" + "Roll number already used in this section…" → Edit roll no → Import 1 row → Imported 4, "All rows … done". "Open student" opens the profile with the parent. Admit page guardian search: **one** result for the shared parent, listing both sibling names. Storage check (row 1c). |
 | 3.4 | Playwright: re-upload the same file | ✅ live (see note) | Test 4. Same bytes → "This file was imported on … Importing again won't create duplicates." Rows 2–4: "Already exists — nothing will change". **Row 5 is "Needs fixing", not "Already exists":** the file still has the invalid date 31/02/2019, and the server validates a row before matching it (mismatch 2). "Confirm 3 existing rows" → "0 imported, 3 already existed (nothing changed)". Then Close import (confirm text checked) → read-only, "Closed — some rows not imported". The student search still shows exactly 4 students for the run. |
-| 3.5 | Playwright: placements into a second year | ✅ live | Test 5. Creates 2027-28 (1 Apr 2027 – 31 Mar 2028, not current) in Setup if missing; imports its Class 1 A section (classes & sections into 2027-28); placements CSV → 2 Ready, 1 "No student with this admission number. Import students first." → Import 2 rows. Profile class history: "2027-28: Class 1 A · Roll …, 1 Apr 2027 – now" and the 2026-27 row now ends "1 Apr 2026 – 1 Apr 2027" (exclusive end = day after 31 Mar 2027; see mismatch 3). |
+| 3.5 | Playwright: placements into a second year | ✅ live | Test 5. Creates 2027-28 (1 Apr 2027 – 31 Mar 2028, not current) in Setup if missing; imports its Class 1 A section (classes & sections into 2027-28); placements CSV → 2 Ready, 1 "No student with this admission number. Import students first." → Import 2 rows. Profile class history: "2027-28: Class 1 A · Roll …, 1 Apr 2027 – now" and the 2026-27 row now ends "1 Apr 2026 – 31 Mar 2027" (stored `effective_to` 2027-04-01 is exclusive; the profile shows the last day — review fix 11). |
 | 3.6 | Playwright: Teacher has no Imports | ✅ live | Test 6. `demo.teacher`: no "Imports" link; `/imports` and `/imports/new` show "You don't have access to this page". Server: `list_import_jobs` and `get_import_template` as the Teacher return `FORBIDDEN`. |
 | 4 | 375px screenshots | ✅ | `docs/reports/m1b-screens/`: `375-imports-history.png`, `375-mapping-step.png`, `375-preview-with-errors.png`, `375-results.png`. Each test asserts no horizontal scroll at 375px. As in M1, the fixed bottom bar appears mid-image in full-page captures (Playwright stitching). |
 | 5 | Report: RPCs, mismatches, not verified | ✅ | Below. |
@@ -55,6 +55,55 @@ directory shows a list instead of the table, and the edit dialog had two buttons
 now "Cancel"). The M1b-only suite then passed 8/8. The M0/M1 screenshots the suite rewrites were restored to
 their committed versions. Afterwards the M1b suite ran once more, 8/8, after a test-only change: the screenshot
 helper hides toasts and scrolls to the top so no toast covers the results screen. `m1b-screens/` comes from that run.
+
+## Review fixes
+
+Done after the owner's review (18 Oct). All five commands pass (16 files / **250 tests**). The full live suite was run
+once afterwards: **26/26** (M0 6 + M1 12 + M1b 8, 6.0 min). `m1b-screens/` were refreshed by that run; the M0/M1
+screenshots were restored to their committed versions.
+
+1. **Formulas whose result is an empty string.** ExcelJS 4.4 returns `{formula}` with no result both for
+   `=IF(…,"",…)` / `=IFERROR(…,"")` (Excel writes `t="str"` + empty `<v>`) and for a formula never calculated (no
+   `<v>`). Checked by loading both shapes: identical. They can't be told apart, so neither refuses the file any
+   more; both import as a blank cell (the server flags a blank required value on that row). Test:
+   `m1b-parse.test.ts` › "hand-built sheet: =IF(1=1,"","x")…" (XML patched with `jszip` to exactly what Excel writes).
+2. **CSV encoding.** Valid UTF-8 → as is. Invalid UTF-8 that still contains valid multi-byte sequences → UTF-8
+   non-fatally (U+FFFD only at the bad bytes) plus a warning before upload naming the rows with "�". Windows-1252 only
+   when there is no valid multi-byte UTF-8 at all. Tests: "a Telugu name plus one stray 0x96 byte…" (name intact,
+   row 3 named), "falls back to Windows-1252 only when…", and the wizard test "a CSV with one unreadable byte shows
+   which rows to check".
+3. **Import run state.** The run (state, latest commit response) now lives in `ImportJobPage` above the data states;
+   after the first load the page is never replaced by an error panel — a failed refresh shows "This import couldn't
+   be refreshed… may be out of date" + Try again, and the "Some rows may already be imported — Continue" warning
+   stays. `useImportJob` uses `keepPreviousData` (switching filters keeps the page; the old rows are dimmed and
+   disabled until the new ones load). During a run the filter tabs, Edit, Remove/Restore, Load more and Close
+   import are disabled. Tiles and the run result use the newer of the page's job and the latest commit response
+   (`outcome.job.counts`). Tests: "outage: commit AND the background refresh fail…" (`get_import_job` fails from the
+   first failed commit to the end; the warning survives, and after Continue the numbers come from the commit
+   response while the page copy is stale) and "while a run is in progress: … disabled".
+4. **Wording.** Only existing rows left and nothing to fix: "These rows already exist. Confirming re-checks them;
+   anything missing now will be created." (with rows to fix, the same plus "Rows that need fixing are left out").
+   The stall message is now "No rows were processed. Reload the import and try again." with a Reload button.
+   Tests: "only existing rows left…", "a chunk that processes nothing…".
+5. **Hidden sheets** are skipped: the first visible sheet is read; a workbook with none is refused. Test: "skips
+   hidden sheets…" (hidden + very hidden before the data sheet).
+6. **Parent mobile alias.** In Students & parents, a header that is exactly "Mobile", "Phone" or "Contact" maps to
+   Parent 1 mobile (`guardian1_phone`); "Student mobile" still maps to the student's. Staff is unchanged. Test:
+   "students & parents: a bare "Mobile" / "Phone" / "Contact" header…".
+7. **Rows with data only in unmapped columns** are not staged; step 5 says "N rows had no data in the mapped columns
+   and were skipped (rows …)" before upload, and the counts/progress use the staged rows. Tests:
+   "rows with values only in unmapped columns are not staged…" (logic) and the wizard test that checks
+   `stage_import_rows` receives only row 2.
+8. **Staff-groups queries** (`staff-groups`, `staff-groups-finance`) are invalidated after any commit.
+9. **`pending` row status** is accepted by the contract (the table allows it; no RPC sets it today) and shown as
+   "Being imported" (not editable). Test: "pending rows … parse and show as "Being imported"".
+10. **Capability on the job page.** "Import N rows" is disabled when the role lacks the dataset's capability
+    (`setup.manage` / `staff.manage` / `students.manage`, same rule as the wizard), with "Your role can't import
+    <dataset>…". Test: "a role without the dataset capability (staff.manage)…".
+11. **Placement dates on the student profile** show `addDays(to, −1)` (the stored `effective_to` is exclusive).
+    E2E test 5 now expects "1 Apr 2026 – 31 Mar 2027" — verified live. Not unit-tested (no M1 profile fixture).
+12. **E2E Demo School guard.** Every sign-in in `m1b.spec.ts` (`asUser`, used by every test) asserts the header
+    (`context-summary`) shows "Demo School" before doing anything.
 
 ## RPCs used by M1b
 
@@ -85,10 +134,8 @@ Also used: `get_setup_snapshot` (years for the year select), `save_class`, `save
 2. **Re-importing a file with an invalid value doesn't show that row as "Already exists".** `imp_validate` reports
    field errors even when the record exists, so on re-upload such a row is "Needs fixing" (test 4, row 5). Brief
    test 4 says "every row Already exists"; that holds only for rows whose values are valid. Not changed.
-3. **Placement end date display (M1 screen, not changed).** `effective_to` is exclusive; the 2026-27 placement
-   closed by the placements import is stored with `effective_to = 2027-04-01` and the M1 profile shows
-   "1 Apr 2026 – 1 Apr 2027", although the last day in that class was 31 Mar 2027. Suggest the profile show
-   `to − 1 day` (outside M1b's scope).
+3. **Placement end date display (M1 screen) — fixed in review fix 11.** `effective_to` is exclusive; the profile
+   showed it as the last day ("1 Apr 2026 – 1 Apr 2027"). It now shows `to − 1 day` ("… – 31 Mar 2027").
 4. **Generated type:** `start_import.p_academic_year_id` is typed `string`, but staff imports send `null`
    (the SQL accepts it). One cast in `startImportJob`, approved by the owner.
 5. **Import button when only existing rows remain.** The brief says "Import <ready> rows (disabled when 0)", but
@@ -102,15 +149,15 @@ Also used: `get_setup_snapshot` (years for the year select), `save_class`, `save
 
 - **Parsing** runs in a module Web Worker (`parse.worker.ts`) that lazy-loads exceljs/papaparse; where a worker
   can't start, the same code runs on the main thread. Everything becomes text: Excel dates via UTC parts, numbers
-  without exponent/".0", rich text/hyperlinks as text, formula results (a formula without a saved value refuses
-  the file), merged cells only in their top-left cell, error values (`#N/A`) as text so the server flags the row.
+  without exponent/".0", rich text/hyperlinks as text, formula results (a formula without a result is blank — see
+  review fix 1), only the first visible sheet, merged cells only in their top-left cell, error values (`#N/A`) as text so the server flags the row.
 - **Templates:** XLSX "Data" sheet columns are text-formatted (so Excel won't turn `2024/001` into a date); required
   columns carry a "Required" note. The CSV template is the header row only; its help is shown on screen.
 - **Operation ids:** `start_import` uses `OperationTracker` (same id after NETWORK/UNKNOWN/TEMPORARILY_UNAVAILABLE,
   new id after success, a definite refusal, or a changed file/mapping). Staging and commit need no ids
   (re-staging replaces drafts; committing again never duplicates).
 - **Invalidation:** after any commit: the job, the history, `setup`, `students`, `student`, `staff-list`, `staff`,
-  `guardian`, `guardian-search`.
+  `staff-groups`, `staff-groups-finance`, `guardian`, `guardian-search`.
 - **Context switch:** the wizard is reset by M0's `RootLayout` (keyed by the session epoch); query keys carry the
   context revision.
 - Leaving the wizard mid-upload asks first (`useBlocker` + `beforeunload`).
@@ -119,8 +166,10 @@ Also used: `get_setup_snapshot` (years for the year select), `save_class`, `save
 ## Known gaps / not verified
 
 - **Not exercised live:** Continue after a staging or commit network failure (unit + component tests only);
-  Restore of a removed row; the "stalled" guard; "Load more" (no job had more than 100 rows); the main-thread
-  parsing fallback (jsdom only); a Windows-1252 CSV; the leave-mid-upload confirmation (not tested at all).
+  Restore of a removed row; the "no rows processed" guard; "Load more" (no job had more than 100 rows); the
+  main-thread parsing fallback (jsdom only); Windows-1252 and lossy UTF-8 CSVs; hidden sheets; empty-string formula
+  results; the parent-mobile alias; skipped empty rows; the disabled Import for a role without the dataset
+  capability; the leave-mid-upload confirmation (not tested at all). All except the last are unit/component tested.
 - **Large files:** a 10,000-row / 5 MB file was not run live (only the row-limit logic is unit-tested), so worker
   parse time and upload time at that size are not measured.
 - **Partly uploaded imports:** if someone leaves during staging, the import holds only the rows sent so far; the
@@ -151,6 +200,7 @@ one students import (`students-COQ75.xlsx`) still "In preview" with nothing comm
   (Imports nav item + icon).
 - **Build:** `vite.config.ts` (`worker.format: 'es'`; raw chunk warning 1000 KB for the lazy exceljs chunk),
   `scripts/check-bundle.mjs` (initial gzip budget + lazy-library checks), `package.json`, `package-lock.json`.
+- **M1 file (review fix 11):** `src/features/students/StudentProfilePage.tsx` (placement end date).
 - **Tests:** `tests/unit/m1b-{parse,logic}.test.ts`, `tests/unit/m1b-pages.test.tsx`, `tests/unit/m1b-fixtures.ts`,
   `tests/e2e/m1b.spec.ts`.
 - **Docs:** this report, `docs/reports/m1b-screens/*.png`.
@@ -160,5 +210,7 @@ one students import (`students-COQ75.xlsx`) still "In preview" with nothing comm
   route/worker only.
 - `papaparse@5.7.0`: CSV parsing (quoted fields, newlines in cells, delimiter detection). Lazy-loaded likewise.
 - `@types/papaparse` (dev): its types.
+- `jszip@3.10.2` (dev, review fix 1): the unit test hand-builds the XLSX XML Excel writes for `=IF(1=1,"","x")`.
+  Same version exceljs already installs (deduped, no new code in the app).
 
 **Backend:** no migrations or Edge Function changes.
