@@ -367,7 +367,9 @@ test('3. Day-wise date: the class teacher marks the day register, including a ha
   await noHorizontalScroll(page);
   await shot(page, '375-marking-roster');
   await page.getByRole('button', { name: /Save attendance/ }).click();
-  await expect(page.getByText('Saved.')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('roster-save-bar').getByText('Saved.', { exact: true })).toBeVisible({
+    timeout: 30_000,
+  });
   await expect(
     page.getByTestId('roster-row').filter({ has: page.locator('[data-state="changed"]') }),
   ).toHaveCount(0);
@@ -396,7 +398,9 @@ test('4. Admin marks a teacher absent → the day view flags it → substitute a
     (await lata.getByRole('radio', { name: 'Present' }).getAttribute('aria-checked')) === 'true';
   await lata.getByRole('radio', { name: lataPresent ? 'Late' : 'Present' }).click();
   await page.getByRole('button', { name: /Save staff attendance/ }).click();
-  await expect(page.getByText('Saved.')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('roster-save-bar').getByText('Saved.', { exact: true })).toBeVisible({
+    timeout: 30_000,
+  });
   await expect(meera).toHaveAttribute('data-state', 'marked');
   await expect(meera.getByRole('radio', { name: 'Absent' })).toHaveAttribute('aria-checked', 'true');
 
@@ -502,7 +506,9 @@ test('5. Teacher writes the diary and sets homework from the lesson; checks home
   await noHorizontalScroll(page);
   await shot(page, '375-homework-roster');
   await page.getByRole('button', { name: /Save checks/ }).click();
-  await expect(page.getByText('Saved.')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('roster-save-bar').getByText('Saved.', { exact: true })).toBeVisible({
+    timeout: 30_000,
+  });
   await expect(first).toHaveAttribute('data-state', 'marked');
   await expect(first).toContainText('Completed, correction required');
   // everyone else stays Unchecked — never "not completed"
