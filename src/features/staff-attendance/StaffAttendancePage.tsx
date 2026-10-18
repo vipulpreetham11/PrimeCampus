@@ -7,6 +7,9 @@ import { DateInput } from '@/components/shared/DateInput';
 import { PageHeader } from '@/components/shared/PageHeader';
 import {
   ChoiceGroup,
+  ROSTER_CHOICES_CLASS,
+  ROSTER_ROW_CLASS,
+  RosterRowLabel,
   RosterSaveBar,
   RowStateBadge,
   UnsavedChangesGuard,
@@ -233,42 +236,44 @@ function StaffRoster({ data, reload }: { data: StaffAttendance; reload: () => Pr
           const state = rowState(row);
           const value = shownValue(row);
           const offDay = s.day !== null && (s.day.weight ?? 0) === 0;
+          const dayLabel =
+            s.day?.day_type && s.day.day_type !== 'working'
+              ? (s.day.label ??
+                (s.day.day_type === 'half_day'
+                  ? 'Half day'
+                  : s.day.day_type === 'holiday'
+                    ? 'Holiday'
+                    : 'Weekly off'))
+              : null;
           return (
             <li
               key={s.staff_id}
               {...keyboard.rowProps(i)}
-              className="focus-visible:bg-accent/60 flex flex-wrap items-center gap-x-3 gap-y-2 p-3 outline-none"
+              className={ROSTER_ROW_CLASS}
               aria-label={`${s.name}: ${value ? STATUS_WORD[value] : 'unmarked'}`}
               data-testid="staff-row"
               data-staff={s.name}
               data-state={state}
             >
-              <div className="min-w-0 flex-1 basis-40">
-                <p className="font-medium">{s.name}</p>
-                <p className="text-muted-foreground text-xs">
-                  {s.employee_no} · {s.group}
-                  {s.day?.day_type && s.day.day_type !== 'working' && (
+              <RosterRowLabel
+                name={s.name}
+                badge={<RowStateBadge state={state} />}
+                reference={`${s.employee_no} · ${s.group}`}
+                referenceLabel="Employee number and group"
+                extra={
+                  (dayLabel !== null || s.paid_leave !== null || offDay) && (
                     <>
-                      {' '}
-                      ·{' '}
-                      {s.day.label ??
-                        (s.day.day_type === 'half_day'
-                          ? 'Half day'
-                          : s.day.day_type === 'holiday'
-                            ? 'Holiday'
-                            : 'Weekly off')}
+                      {dayLabel && <Badge variant="outline">{dayLabel}</Badge>}
+                      {s.paid_leave !== null && (
+                        <Badge variant="outline">Paid leave{s.paid_leave < 1 ? ' (half day)' : ''}</Badge>
+                      )}
+                      {offDay && <Badge variant="outline">Not a working day</Badge>}
                     </>
-                  )}
-                </p>
-                <div className="mt-1 flex flex-wrap gap-1">
-                  <RowStateBadge state={state} />
-                  {s.paid_leave !== null && (
-                    <Badge variant="outline">Paid leave{s.paid_leave < 1 ? ' (half day)' : ''}</Badge>
-                  )}
-                  {offDay && <Badge variant="outline">Not a working day</Badge>}
-                </div>
-              </div>
+                  )
+                }
+              />
               <ChoiceGroup
+                className={ROSTER_CHOICES_CLASS}
                 options={options}
                 value={value}
                 onChange={(v) => change(s.staff_id, v)}

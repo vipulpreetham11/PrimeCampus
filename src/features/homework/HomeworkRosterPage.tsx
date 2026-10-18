@@ -7,6 +7,8 @@ import { ErrorText } from '@/components/shared/ErrorText';
 import { PageHeader } from '@/components/shared/PageHeader';
 import {
   ChoiceGroup,
+  ROSTER_CHOICES_CLASS,
+  RosterRowLabel,
   RosterSaveBar,
   RowStateBadge,
   UnsavedChangesGuard,
@@ -287,29 +289,25 @@ function CheckRoster({ data, reload }: { data: HomeworkRoster; reload: () => Pro
               <li
                 key={s.student_id}
                 {...keyboard.rowProps(i)}
-                className="focus-visible:bg-accent/60 space-y-2 p-3 outline-none"
+                className="focus-visible:bg-accent/60 space-y-2 px-2 py-2 outline-none sm:px-3"
                 aria-label={`${s.name}: ${checkWord(v)}${state === 'changed' ? ', not saved' : ''}`}
                 data-testid="check-row"
                 data-student={s.name}
                 data-state={state}
               >
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                  <div className="min-w-0 flex-1 basis-40">
-                    <p className="font-medium">
-                      <span className="text-muted-foreground mr-2 tabular-nums">{s.roll_no ?? '–'}</span>
-                      {s.name}
-                    </p>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <RowStateBadge state={state} unmarkedLabel="Unchecked" />
-                      {v && <span className="text-muted-foreground text-xs">{checkWord(v)}</span>}
-                      {state === 'marked' && s.observed_on && (
-                        <span className="text-muted-foreground text-xs">
-                          checked {formatDate(s.observed_on)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <RosterRowLabel
+                    lead={s.roll_no ?? '–'}
+                    name={s.name}
+                    badge={<RowStateBadge state={state} unmarkedLabel="Unchecked" />}
+                    reference={
+                      v
+                        ? `${checkWord(v)}${state === 'marked' && s.observed_on ? ` · checked ${formatDate(s.observed_on)}` : ''}`
+                        : undefined
+                    }
+                  />
                   <ChoiceGroup
+                    className={ROSTER_CHOICES_CLASS}
                     options={COMPLETION_OPTIONS}
                     value={v?.completion ?? null}
                     onChange={(c) => update(s.student_id, { completion: c })}

@@ -6,6 +6,9 @@ import { ErrorText } from '@/components/shared/ErrorText';
 import { PageHeader } from '@/components/shared/PageHeader';
 import {
   ChoiceGroup,
+  ROSTER_CHOICES_CLASS,
+  ROSTER_ROW_CLASS,
+  RosterRowLabel,
   RosterSaveBar,
   RowStateBadge,
   UnsavedChangesGuard,
@@ -296,20 +299,21 @@ function RosterScreen({
                 <li
                   key={s.student_id}
                   {...keyboard.rowProps(i)}
-                  className="focus-visible:bg-accent/60 flex flex-wrap items-center gap-x-3 gap-y-2 p-3 outline-none"
+                  className={ROSTER_ROW_CLASS}
                   aria-label={`${s.name}: ${value ? STATUS_WORD[value] : 'unmarked'}${state === 'changed' ? ', not saved' : ''}`}
                   data-testid="roster-row"
                   data-student={s.name}
                   data-state={state}
                 >
-                  <div className="min-w-0 flex-1 basis-40">
-                    <p className="font-medium">
-                      <span className="text-muted-foreground mr-2 tabular-nums">{s.roll_no ?? '–'}</span>
-                      {s.name}
-                    </p>
-                    <RowStateBadge state={state} />
-                  </div>
+                  <RosterRowLabel
+                    lead={s.roll_no ?? '–'}
+                    name={s.name}
+                    badge={<RowStateBadge state={state} />}
+                    reference={s.admission_no}
+                    referenceLabel="Admission number"
+                  />
                   <ChoiceGroup
+                    className={ROSTER_CHOICES_CLASS}
                     options={options}
                     value={value}
                     onChange={(v) => set(s.student_id, v)}

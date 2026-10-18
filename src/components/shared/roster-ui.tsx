@@ -11,7 +11,8 @@ import type { AppError } from '@/lib/errors';
 
 // Shared pieces of the bulk rosters (attendance, staff attendance, homework checks). Every state is
 // written out in words — colour is never the only signal — and every control is at least 44px tall
-// on phones.
+// on phones. Rows are compact: who + state on the left, the choice buttons on the right of the same
+// line (about 60px a row at 375px), so a class of 40 is a short scroll.
 
 export interface ChoiceOption<T extends string> {
   value: T;
@@ -30,6 +31,7 @@ export function ChoiceGroup<T extends string>({
   disabled,
   label,
   showLabels = 'sm',
+  className,
 }: {
   options: ChoiceOption<T>[];
   value: T | null;
@@ -39,9 +41,10 @@ export function ChoiceGroup<T extends string>({
   label: string;
   /** Show the full label from this breakpoint (always on 'always'); below it only the short label. */
   showLabels?: 'sm' | 'always';
+  className?: string;
 }) {
   return (
-    <div role="radiogroup" aria-label={label} className="flex flex-wrap gap-1">
+    <div role="radiogroup" aria-label={label} className={cn('flex flex-wrap gap-1', className)}>
       {options.map((o) => {
         const selected = value === o.value;
         return (
@@ -88,13 +91,66 @@ export function RowStateBadge({ state, unmarkedLabel }: { state: RowState; unmar
     <Badge
       variant={state === 'conflict' ? 'destructive' : state === 'changed' ? 'secondary' : 'outline'}
       data-state={state}
-      className={cn(state === 'unmarked' && 'border-dashed')}
+      // a long state ("Changed by someone else") wraps inside a narrow row instead of overflowing it
+      className={cn('max-w-full text-left whitespace-normal', state === 'unmarked' && 'border-dashed')}
     >
       {state === 'conflict' && <AlertTriangle aria-hidden="true" />}
       {text}
     </Badge>
   );
 }
+
+/**
+ * The left side of a compact roster row: the name (with roll number) on one line, then the row's
+ * state in words and a short reference (admission / employee number), truncated rather than wrapped.
+ * `extra` adds an optional third line (e.g. paid leave) only for the rows that have it.
+ */
+export function RosterRowLabel({
+  lead,
+  name,
+  badge,
+  reference,
+  referenceLabel,
+  extra,
+}: {
+  lead?: ReactNode;
+  name: string;
+  badge: ReactNode;
+  reference?: ReactNode;
+  /** Screen-reader name of the reference, e.g. "Admission number". */
+  referenceLabel?: string;
+  extra?: ReactNode;
+}) {
+  return (
+    <div className="min-w-0 flex-1">
+      <p className="truncate text-sm leading-5 font-medium">
+        {lead !== undefined && <span className="text-muted-foreground mr-1.5 tabular-nums">{lead}</span>}
+        {name}
+      </p>
+      {/* slimmer badge padding here so a short admission number still fits beside "Not saved" */}
+      <div className="mt-0.5 flex min-w-0 items-center gap-1 [&_[data-slot=badge]]:px-1.5">
+        {badge}
+        {reference !== undefined && (
+          <span
+            className="text-muted-foreground min-w-0 truncate text-xs"
+            title={typeof reference === 'string' ? reference : undefined}
+            data-testid="row-reference"
+          >
+            {referenceLabel && <span className="sr-only">{referenceLabel} </span>}
+            {reference}
+          </span>
+        )}
+      </div>
+      {extra && <div className="mt-1 flex flex-wrap gap-1">{extra}</div>}
+    </div>
+  );
+}
+
+/** Classes for a compact roster row (`li`): one line at 375px; a conflict wraps below. */
+export const ROSTER_ROW_CLASS =
+  'focus-visible:bg-accent/60 flex flex-wrap items-center gap-x-2 gap-y-2 px-2 py-2 outline-none sm:px-3';
+/** Classes for the row's choice buttons: on the right, never wrapping under the name. */
+export const ROSTER_CHOICES_CLASS = 'shrink-0 flex-nowrap';
 
 /**
  * Roving focus over roster rows: ↑/↓ (and Home/End) move between rows, the option shortcut keys
