@@ -23,6 +23,8 @@ export interface ParsedSheet {
   headers: string[];
   headerRowNo: number;
   rows: ParsedRow[];
+  /** Plain-English notes about the file that don't stop the import (shown before upload). */
+  warnings: string[];
 }
 
 export type ParseResult = { ok: true; sheet: ParsedSheet } | { ok: false; message: string };
@@ -87,6 +89,7 @@ export function sheetFromGrid(grid: Iterable<GridRow>): ParseResult {
     sheet: {
       headers,
       headerRowNo: header.rowNo,
+      warnings: [],
       rows: rows.map((r) => ({
         rowNo: r.rowNo,
         cells: headers.map((_, i) => r.cells[i] ?? ''),

@@ -15,6 +15,9 @@ export async function parseSpreadsheet(
 ): Promise<ParseResult> {
   const kind = fileKind(name);
   if (kind === 'xlsx') return parseXlsx(buffer, await libs.excel());
-  if (kind === 'csv') return parseCsv(decodeCsv(buffer), await libs.papa());
+  if (kind === 'csv') {
+    const { text, lossy } = decodeCsv(buffer);
+    return parseCsv(text, await libs.papa(), lossy);
+  }
   return { ok: false, message: 'Choose an Excel workbook (.xlsx) or a CSV file (.csv).' };
 }

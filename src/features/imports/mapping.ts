@@ -1,4 +1,4 @@
-import type { TemplateColumn } from '@/contracts/imports';
+import type { ImportDataset, TemplateColumn } from '@/contracts/imports';
 import type { ParsedSheet } from './parse/sheet';
 
 // Column mapping (brief §2.4). Template columns come only from get_import_template — no column
@@ -12,14 +12,27 @@ export function normalizeHeader(s: string): string {
 }
 
 /**
- * Auto-match each file header to a template column by label or key. A template column is used at
- * most once: a repeated header stays unmapped.
+ * Headers that mean something specific in one dataset (normalised header → canonical key).
+ * In a students file a bare "Mobile" / "Phone" / "Contact" column is the parent's number — schools
+ * collect the parent's mobile, not the child's — so it maps to Parent 1 mobile, not Student mobile.
  */
-export function autoMap(headers: string[], columns: TemplateColumn[]): Mapping {
+const DATASET_ALIASES: Partial<Record<ImportDataset, Record<string, string>>> = {
+  students_guardians: { mobile: 'guardian1_phone', phone: 'guardian1_phone', contact: 'guardian1_phone' },
+};
+
+/**
+ * Auto-match each file header to a template column: dataset aliases first, then label or key. A
+ * template column is used at most once: a repeated header stays unmapped.
+ */
+export function autoMap(headers: string[], columns: TemplateColumn[], dataset?: ImportDataset): Mapping {
+  const keys = new Set(columns.map((c) => c.key));
   const byName = new Map<string, string>();
   for (const c of columns) {
     byName.set(normalizeHeader(c.label), c.key);
     if (!byName.has(normalizeHeader(c.key))) byName.set(normalizeHeader(c.key), c.key);
+  }
+  for (const [alias, key] of Object.entries((dataset && DATASET_ALIASES[dataset]) ?? {})) {
+    if (keys.has(key)) byName.set(alias, key);
   }
   const used = new Set<string>();
   return headers.map((h) => {
@@ -77,16 +90,26 @@ export interface StageRow {
   data: Record<string, string>;
 }
 
-/** Rows for stage_import_rows: canonical key → cell text, mapped columns only, blanks omitted. */
-export function buildStageRows(sheet: ParsedSheet, mapping: Mapping): StageRow[] {
-  return sheet.rows.map((r) => {
+/**
+ * Rows for stage_import_rows: canonical key → cell text, mapped columns only, blanks omitted.
+ * A row with values only in unmapped columns is not staged; its row number is returned instead.
+ */
+export function buildStageRows(
+  sheet: ParsedSheet,
+  mapping: Mapping,
+): { rows: StageRow[]; emptyRows: number[] } {
+  const rows: StageRow[] = [];
+  const emptyRows: number[] = [];
+  for (const r of sheet.rows) {
     const data: Record<string, string> = {};
     mapping.forEach((key, i) => {
       const v = r.cells[i] ?? '';
       if (key !== null && v !== '') data[key] = v;
     });
-    return { row_no: r.rowNo, data };
-  });
+    if (Object.keys(data).length === 0) emptyRows.push(r.rowNo);
+    else rows.push({ row_no: r.rowNo, data });
+  }
+  return { rows, emptyRows };
 }
 
 /** What start_import records as p_mapping: the file header → key pairs (no cell values). */

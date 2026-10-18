@@ -1,5 +1,6 @@
 import * as ExcelJS from 'exceljs';
 import Papa from 'papaparse';
+import JSZip from 'jszip';
 import { afterAll, describe, expect, it } from 'vitest';
 import { decodeCsv, parseCsv, type PapaModule } from '@/features/imports/parse/csv';
 import { dateToIsoUtc, excelValueToText, numberToText } from '@/features/imports/parse/cells';
@@ -57,19 +58,14 @@ describe('cell text', () => {
     expect(new Date(Date.UTC(2016, 3, 12)).getHours()).toBe(5); // 05:30 IST
   });
 
-  it('formulas use the saved result; without one the cell is flagged', () => {
-    expect(excelValueToText({ formula: 'A1*2', result: 42 })).toEqual({ kind: 'text', text: '42' });
-    expect(excelValueToText({ sharedFormula: 'A1', result: 'x' })).toEqual({ kind: 'text', text: 'x' });
-    expect(excelValueToText({ formula: 'A1*2' })).toEqual({ kind: 'unsaved-formula' });
-    expect(excelValueToText({ richText: [{ text: 'Ravi ' }, { text: 'Kumar' }] })).toEqual({
-      kind: 'text',
-      text: 'Ravi Kumar',
-    });
-    expect(excelValueToText({ text: 'mail', hyperlink: 'mailto:a@b.c' })).toEqual({
-      kind: 'text',
-      text: 'mail',
-    });
-    expect(excelValueToText(true)).toEqual({ kind: 'text', text: 'TRUE' });
+  it('formulas use the saved result; a formula without a result is a blank cell', () => {
+    expect(excelValueToText({ formula: 'A1*2', result: 42 })).toBe('42');
+    expect(excelValueToText({ sharedFormula: 'A1', result: 'x' })).toBe('x');
+    expect(excelValueToText({ formula: 'IF(1=1,"","x")' })).toBe('');
+    expect(excelValueToText({ formula: 'A1*2', result: '' })).toBe('');
+    expect(excelValueToText({ richText: [{ text: 'Ravi ' }, { text: 'Kumar' }] })).toBe('Ravi Kumar');
+    expect(excelValueToText({ text: 'mail', hyperlink: 'mailto:a@b.c' })).toBe('mail');
+    expect(excelValueToText(true)).toBe('TRUE');
   });
 });
 
@@ -125,15 +121,52 @@ describe('XLSX parsing', () => {
     },
   );
 
-  it('refuses a file with formula cells that have no saved value, naming the cells', async () => {
-    const bytes = await xlsxBytes((ws) => {
-      ws.addRow(['Name', 'Total']);
-      ws.addRow(['A', { formula: 'B1*2' }]);
-      ws.addRow(['B', { formula: 'B2*2' }]);
+  it('hand-built sheet: =IF(1=1,"","x") saved as an empty string imports as a blank cell (file not refused)', async () => {
+    // Exactly what Excel writes for a formula whose result is "": t="str" and an empty <v>. ExcelJS 4.4
+    // reads it as {formula} with no result, the same as a never-calculated formula (C2, no <v> at all).
+    const base = await xlsxBytes((ws) => {
+      ws.addRow(['Name', 'Calc', 'Never', 'Total']);
+      ws.addRow(['Ravi', 'B', 'C', 'D']);
     });
-    const r = await parseXlsx(bytes, excel);
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.message).toMatch(/no saved value \(B2, B3\)/);
+    const zip = await JSZip.loadAsync(base);
+    const path = Object.keys(zip.files).find((f) => /worksheets\/sheet1\.xml$/.test(f))!;
+    const xml = (await zip.file(path)!.async('string'))
+      .replace(/<c r="B2"[^>]*>.*?<\/c>/, '<c r="B2" t="str"><f>IF(1=1,"","x")</f><v></v></c>')
+      .replace(/<c r="C2"[^>]*>.*?<\/c>/, '<c r="C2"><f>A2&amp;"x"</f></c>')
+      .replace(/<c r="D2"[^>]*>.*?<\/c>/, '<c r="D2"><f>2*21</f><v>42</v></c>');
+    expect(xml).toContain('<f>IF(1=1,"","x")</f><v></v>');
+    zip.file(path, xml);
+    const bytes = (await zip.generateAsync({ type: 'arraybuffer' })) as ArrayBuffer;
+
+    const sheet = sheetOf(await parseXlsx(bytes, excel));
+    expect(sheet.rows).toEqual([{ rowNo: 2, cells: ['Ravi', '', '', '42'] }]);
+  });
+
+  it('skips hidden sheets: the first VISIBLE sheet is read', async () => {
+    const bytes = await xlsxBytes((ws, wb) => {
+      ws.state = 'hidden';
+      ws.addRow(['Lookup']);
+      ws.addRow(['hidden value']);
+      const veryHidden = wb.addWorksheet('Codes');
+      veryHidden.state = 'veryHidden';
+      veryHidden.addRow(['Codes']);
+      veryHidden.addRow(['x']);
+      const data = wb.addWorksheet('Data');
+      data.addRow(['Name']);
+      data.addRow(['Ravi']);
+    });
+    const sheet = sheetOf(await parseXlsx(bytes, excel));
+    expect(sheet.headers).toEqual(['Name']);
+    expect(sheet.rows).toEqual([{ rowNo: 2, cells: ['Ravi'] }]);
+
+    const allHidden = await xlsxBytes((ws) => {
+      ws.state = 'hidden';
+      ws.addRow(['x']);
+    });
+    expect(await parseXlsx(allHidden, excel)).toEqual({
+      ok: false,
+      message: 'This workbook has no visible sheets.',
+    });
   });
 
   it('merged cells keep the value only in the top-left cell', async () => {
@@ -160,10 +193,12 @@ describe('XLSX parsing', () => {
 
 describe('CSV parsing', () => {
   it('BOM, header after blank lines, quoted commas/newlines, blank rows skipped, row numbers kept', () => {
-    const text = decodeCsv(
+    const { text, lossy } = decodeCsv(
       csvBytes('﻿\n\nName,Mobile,Note\n"Rao, Meera",9876543210,"two\nlines"\n,,\n  Ravi  ,09876543210,x\n'),
     );
+    expect(lossy).toBe(false);
     const sheet = sheetOf(parseCsv(text, papa));
+    expect(sheet.warnings).toEqual([]);
     expect(sheet.headerRowNo).toBe(3);
     expect(sheet.headers).toEqual(['Name', 'Mobile', 'Note']);
     expect(sheet.rows).toEqual([
@@ -172,9 +207,27 @@ describe('CSV parsing', () => {
     ]);
   });
 
-  it('falls back to Windows-1252 when the bytes are not UTF-8 (Excel "CSV" on Windows)', () => {
+  it('falls back to Windows-1252 only when there is no valid multi-byte UTF-8 at all', () => {
     const bytes = new Uint8Array([0x4e, 0x61, 0x6d, 0x65, 0x0a, 0x4a, 0x6f, 0x73, 0xe9]); // "Name\nJosé" in cp1252
-    expect(decodeCsv(bytes.buffer)).toBe('Name\nJosé');
+    expect(decodeCsv(bytes.buffer)).toEqual({ text: 'Name\nJosé', lossy: false });
+  });
+
+  it('a Telugu name plus one stray 0x96 byte: stays UTF-8, the name is intact, the bad row is named', () => {
+    const enc = new TextEncoder();
+    const bytes = new Uint8Array([
+      ...enc.encode('Name,Mobile\nరవి కుమార్,9876543210\nRavi '),
+      0x96, // a Windows-1252 en dash pasted into an otherwise UTF-8 file
+      ...enc.encode(' Kumar,9876543211\n'),
+    ]);
+    const decoded = decodeCsv(bytes.buffer);
+    expect(decoded.lossy).toBe(true);
+    expect(decoded.text).toContain('రవి కుమార్');
+    expect(decoded.text).toContain('Ravi \uFFFD Kumar');
+    const sheet = sheetOf(parseCsv(decoded.text, papa, decoded.lossy));
+    expect(sheet.rows[0]!.cells[0]).toBe('రవి కుమార్');
+    expect(sheet.warnings).toEqual([
+      'Some characters could not be read and show as � in row 3. Check those rows after uploading, or save the file as "CSV UTF-8" and upload it again.',
+    ]);
   });
 
   it('refuses an unclosed quote with its row number', () => {

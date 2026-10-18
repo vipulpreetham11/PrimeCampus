@@ -30,35 +30,36 @@ export function dateToIsoUtc(d: Date): string {
   return `${String(y).padStart(4, '0')}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
-export type CellText = { kind: 'text'; text: string } | { kind: 'unsaved-formula' };
-
-const text = (t: string): CellText => ({ kind: 'text', text: t.trim() });
-
 function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null;
 }
 
-/** Convert one ExcelJS cell value (any of its CellValue shapes) to text. */
-export function excelValueToText(v: unknown): CellText {
-  if (v === null || v === undefined) return text('');
-  if (typeof v === 'string') return text(v);
-  if (typeof v === 'number') return text(numberToText(v));
-  if (typeof v === 'boolean') return text(v ? 'TRUE' : 'FALSE');
-  if (v instanceof Date) return text(dateToIsoUtc(v));
+/**
+ * Convert one ExcelJS cell value (any of its CellValue shapes) to trimmed text.
+ *
+ * Formulas use the saved (cached) result — the app is not an Excel calculation engine (TRD §14.2).
+ * A formula without a result becomes ''. ExcelJS 4.4 reports a formula whose saved result is an
+ * empty string (=IF(B2="","",…), =IFERROR(…,"")) exactly like one that was never calculated, so the
+ * two can't be told apart and neither refuses the file; a blank required value is flagged per row
+ * by the server.
+ */
+export function excelValueToText(v: unknown): string {
+  if (v === null || v === undefined) return '';
+  if (typeof v === 'string') return v.trim();
+  if (typeof v === 'number') return numberToText(v);
+  if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE';
+  if (v instanceof Date) return dateToIsoUtc(v);
   if (isObject(v)) {
-    // Formula: use the saved (cached) result. The app is not an Excel calculation engine (TRD §14.2).
-    if ('formula' in v || 'sharedFormula' in v) {
-      if (!('result' in v) || v.result === undefined || v.result === null) return { kind: 'unsaved-formula' };
-      return excelValueToText(v.result);
-    }
+    if ('formula' in v || 'sharedFormula' in v) return excelValueToText(v.result);
     if (Array.isArray(v.richText)) {
-      return text(
-        v.richText.map((p: unknown) => (isObject(p) && typeof p.text === 'string' ? p.text : '')).join(''),
-      );
+      return v.richText
+        .map((p: unknown) => (isObject(p) && typeof p.text === 'string' ? p.text : ''))
+        .join('')
+        .trim();
     }
     if ('hyperlink' in v && 'text' in v) return excelValueToText(v.text);
-    if ('error' in v && typeof v.error === 'string') return text(v.error); // '#N/A' etc.: server flags the row
-    if ('text' in v && typeof v.text === 'string') return text(v.text);
+    if ('error' in v && typeof v.error === 'string') return v.error; // '#N/A' etc.: server flags the row
+    if ('text' in v && typeof v.text === 'string') return v.text.trim();
   }
-  return text('');
+  return '';
 }

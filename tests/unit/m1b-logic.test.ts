@@ -70,6 +70,28 @@ describe('header auto-mapping', () => {
     expect(m).toEqual(['employee_no', 'full_name', 'staff_group', 'joined_on', 'phone', null]);
   });
 
+  it('students & parents: a bare "Mobile" / "Phone" / "Contact" header is the parent\'s mobile', () => {
+    // private.imp_columns('students_guardians'), the two phone columns
+    const cols = [
+      { key: 'admission_no', label: 'Admission no', required: true },
+      { key: 'mobile', label: 'Student mobile', required: false },
+      { key: 'guardian1_phone', label: 'Parent 1 mobile', required: true },
+    ];
+    for (const h of ['Mobile', 'PHONE', ' contact ']) {
+      expect(autoMap(['Admission no', h], cols, 'students_guardians')).toEqual([
+        'admission_no',
+        'guardian1_phone',
+      ]);
+    }
+    // explicit headers still go where they say
+    expect(autoMap(['Student mobile', 'Parent 1 mobile'], cols, 'students_guardians')).toEqual([
+      'mobile',
+      'guardian1_phone',
+    ]);
+    // other datasets are unchanged: staff "Mobile" is the staff phone
+    expect(autoMap(['Mobile'], COLS, 'staff')).toEqual(['phone']);
+  });
+
   it('a repeated header is matched once; the second copy is left unmapped', () => {
     expect(autoMap(['Full name', 'Full Name', 'Employee no'], COLS)).toEqual([
       'full_name',
@@ -101,18 +123,25 @@ describe('stage rows', () => {
   const sheet: ParsedSheet = {
     headers: ['Employee no', 'Ignored', 'Mobile'],
     headerRowNo: 1,
+    warnings: [],
     rows: [
       { rowNo: 2, cells: ['T1', 'x', ''] },
       { rowNo: 4, cells: ['', '', '98'] },
       { rowNo: 5, cells: ['T3', 'y', '99'] },
+      { rowNo: 7, cells: ['', 'only in an unmapped column', ''] },
     ],
   };
   it('send only mapped columns, omit blanks, keep spreadsheet row numbers', () => {
-    expect(buildStageRows(sheet, ['employee_no', null, 'phone'])).toEqual([
+    expect(buildStageRows(sheet, ['employee_no', null, 'phone']).rows).toEqual([
       { row_no: 2, data: { employee_no: 'T1' } },
       { row_no: 4, data: { phone: '98' } },
       { row_no: 5, data: { employee_no: 'T3', phone: '99' } },
     ]);
+  });
+  it('rows with values only in unmapped columns are not staged; their row numbers are returned', () => {
+    const { rows, emptyRows } = buildStageRows(sheet, ['employee_no', null, 'phone']);
+    expect(rows.map((r) => r.row_no)).not.toContain(7);
+    expect(emptyRows).toEqual([7]);
   });
   it('samples are the first 3 non-empty values', () => {
     expect(sampleValues(sheet, 2)).toEqual(['98', '99']);
