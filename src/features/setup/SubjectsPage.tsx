@@ -43,7 +43,7 @@ function SubjectDialog({
   const [error, setError] = useState<unknown>(null);
   const form = useForm<Values>({
     resolver: zodResolver(schema),
-    values: subject
+    defaultValues: subject
       ? { name: subject.name, code: subject.code, status: subject.status }
       : { name: '', code: '', status: 'active' },
   });
@@ -98,7 +98,9 @@ function SubjectDialog({
 export function SubjectsPage() {
   const query = useSetupSnapshot(null);
   const canManage = useCan('setup.manage');
-  const [editing, setEditing] = useState<SubjectRow | null>(null);
+  // Keep only the id: the dialog reads the latest row and is keyed on its version (CONFLICT → refetch → fresh form).
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const editing = query.data?.subjects.find((s) => s.id === editingId) ?? null;
   const [open, setOpen] = useState(false);
   return (
     <Card>
@@ -108,7 +110,7 @@ export function SubjectsPage() {
           <Button
             size="sm"
             onClick={() => {
-              setEditing(null);
+              setEditingId(null);
               setOpen(true);
             }}
           >
@@ -142,7 +144,7 @@ export function SubjectsPage() {
                           size="sm"
                           variant="outline"
                           onClick={() => {
-                            setEditing(s);
+                            setEditingId(s.id);
                             setOpen(true);
                           }}
                         >
@@ -157,12 +159,15 @@ export function SubjectsPage() {
           )}
         </DataState>
       </CardContent>
-      <SubjectDialog
-        subject={editing}
-        open={open}
-        onOpenChange={setOpen}
-        onReload={() => void query.refetch()}
-      />
+      {open && (editingId === null || editing) && (
+        <SubjectDialog
+          key={editing?.version ?? 'new'}
+          subject={editing}
+          open
+          onOpenChange={setOpen}
+          onReload={() => void query.refetch()}
+        />
+      )}
     </Card>
   );
 }

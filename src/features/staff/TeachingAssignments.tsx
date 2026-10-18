@@ -217,6 +217,7 @@ export function AssignmentList({
           <ul className="space-y-2">
             {rows.map((a) => {
               const active = !a.effective_to || compareIsoDates(a.effective_to, today) > 0;
+              const upcoming = compareIsoDates(a.effective_from, today) > 0;
               return (
                 <li
                   key={a.id}
@@ -234,7 +235,13 @@ export function AssignmentList({
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    {active ? <Badge>Active</Badge> : <Badge variant="outline">Ended</Badge>}
+                    {!active ? (
+                      <Badge variant="outline">Ended</Badge>
+                    ) : upcoming ? (
+                      <Badge variant="secondary">Starts {formatDate(a.effective_from)}</Badge>
+                    ) : (
+                      <Badge>Active</Badge>
+                    )}
                     {canManage && active && (
                       <Button
                         size="sm"

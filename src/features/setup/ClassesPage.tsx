@@ -13,7 +13,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Form } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import type { ClassRow, SectionRow, SetupSnapshot } from '@/contracts/setup';
+import type { ClassRow, ClassSubject, SectionRow, SetupSnapshot } from '@/contracts/setup';
 import { handleSaveError } from '@/lib/save-feedback';
 import { useCan } from '@/lib/scope';
 import {
@@ -61,7 +61,7 @@ function ClassDialog({
   const [error, setError] = useState<unknown>(null);
   const form = useForm<ClassValues>({
     resolver: zodResolver(classSchema),
-    values: cls
+    defaultValues: cls
       ? { name: cls.name, sort_order: String(cls.sort_order), status: cls.status }
       : { name: '', sort_order: String(nextOrder), status: 'active' },
   });
@@ -154,7 +154,7 @@ function SectionDialog({
   const [error, setError] = useState<unknown>(null);
   const form = useForm<SectionValues>({
     resolver: zodResolver(sectionSchema),
-    values: section
+    defaultValues: section
       ? {
           name: section.name,
           capacity: section.capacity === null ? '' : String(section.capacity),
@@ -279,12 +279,16 @@ function ClassSubjectsForm({
   cls: ClassRow;
   yearId: string;
   snapshot: SetupSnapshot;
-  current: { subject_id: string; is_optional: boolean; sort_order: number }[];
+  current: ClassSubject[];
   onDone: () => void;
 }) {
   const save = useSaveClassSubjects();
   const [error, setError] = useState<unknown>(null);
   const subjects = snapshot.subjects.filter((s) => s.status === 'active');
+  // Saving is a full replace: mappings to subjects retired since are kept as they are (read-only),
+  // so saving here never silently drops them.
+  const activeIds = new Set(subjects.map((s) => s.id));
+  const retiredKept = current.filter((c) => !activeIds.has(c.subject_id));
   const [picks, setPicks] = useState<Record<string, SubjectPick>>(() =>
     Object.fromEntries(
       subjects.map((s, i) => {
@@ -302,7 +306,7 @@ function ClassSubjectsForm({
   );
   const badOrder = Object.values(picks).some((p) => p.include && !/^\d{1,4}$/.test(p.sort_order.trim()));
 
-  if (subjects.length === 0) {
+  if (subjects.length === 0 && retiredKept.length === 0) {
     return <p className="text-muted-foreground text-sm">Add subjects first (Subjects tab).</p>;
   }
   const set = (id: string, patch: Partial<SubjectPick>) =>
@@ -344,6 +348,26 @@ function ClassSubjectsForm({
           );
         })}
       </ul>
+      {retiredKept.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-sm font-medium">Retired subjects still on this class</p>
+          <ul className="divide-y rounded-md border" aria-label="Retired subjects (kept)">
+            {retiredKept.map((c) => (
+              <li key={c.subject_id} className="flex flex-wrap items-center gap-3 p-3 text-sm">
+                <span className="min-w-40 flex-1">
+                  {c.subject} <span className="text-muted-foreground text-xs">({c.code})</span>
+                </span>
+                <Badge variant="outline">Retired</Badge>
+                {c.is_optional && <span className="text-muted-foreground">Optional</span>}
+                <span className="text-muted-foreground">Order {c.sort_order}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-muted-foreground text-xs">
+            Kept unchanged when you save. Reactivate the subject on the Subjects tab to edit it here.
+          </p>
+        </div>
+      )}
       {badOrder && <p className="text-destructive text-sm">Order must be a whole number.</p>}
       <ErrorText error={error} />
       <div className="flex justify-end gap-2">
@@ -358,13 +382,20 @@ function ClassSubjectsForm({
               await save.mutateAsync({
                 yearId,
                 classId: cls.id,
-                subjects: Object.entries(picks)
-                  .filter(([, p]) => p.include)
-                  .map(([subject_id, p]) => ({
-                    subject_id,
-                    is_optional: p.is_optional,
-                    sort_order: Number(p.sort_order),
+                subjects: [
+                  ...Object.entries(picks)
+                    .filter(([, p]) => p.include)
+                    .map(([subject_id, p]) => ({
+                      subject_id,
+                      is_optional: p.is_optional,
+                      sort_order: Number(p.sort_order),
+                    })),
+                  ...retiredKept.map((c) => ({
+                    subject_id: c.subject_id,
+                    is_optional: c.is_optional,
+                    sort_order: c.sort_order,
                   })),
+                ],
               });
               toast.success(`Subjects for ${cls.name} saved.`);
               onDone();
@@ -381,10 +412,12 @@ function ClassSubjectsForm({
 }
 
 // ------------------------------------------------------------------ page
+// Only ids are kept: the dialogs read the row from the latest snapshot and are keyed on its version, so
+// after a CONFLICT + refetch they reopen on the current version instead of resending the old one.
 type Open =
-  | { kind: 'class'; cls: ClassRow | null }
-  | { kind: 'section'; cls: ClassRow; section: SectionRow | null }
-  | { kind: 'subjects'; cls: ClassRow }
+  | { kind: 'class'; clsId: string | null }
+  | { kind: 'section'; clsId: string; sectionId: string | null }
+  | { kind: 'subjects'; clsId: string }
   | null;
 
 export function ClassesPage() {
@@ -399,12 +432,18 @@ export function ClassesPage() {
       {(snap) => {
         const year = snap.academic_years.find((y) => y.id === (yearId ?? snap.selected_year_id));
         const sectionsOf = (classId: string) => snap.sections.filter((s) => s.class_id === classId);
+        const openClass = (open && open.clsId && snap.classes.find((c) => c.id === open.clsId)) || null;
+        const openSection =
+          (open?.kind === 'section' &&
+            open.sectionId &&
+            snap.sections.find((s) => s.id === open.sectionId)) ||
+          null;
         return (
           <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <YearSelect years={snap.academic_years} value={year?.id ?? null} onChange={setYearId} />
               {canManage && (
-                <Button size="sm" onClick={() => setOpen({ kind: 'class', cls: null })}>
+                <Button size="sm" onClick={() => setOpen({ kind: 'class', clsId: null })}>
                   New class
                 </Button>
               )}
@@ -433,7 +472,7 @@ export function ClassesPage() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => setOpen({ kind: 'class', cls: c })}
+                          onClick={() => setOpen({ kind: 'class', clsId: c.id })}
                         >
                           Edit
                         </Button>
@@ -451,7 +490,7 @@ export function ClassesPage() {
                                 <button
                                   type="button"
                                   disabled={!canManage}
-                                  onClick={() => setOpen({ kind: 'section', cls: c, section: s })}
+                                  onClick={() => setOpen({ kind: 'section', clsId: c.id, sectionId: s.id })}
                                   className="enabled:hover:bg-accent rounded-md border px-2 py-1 text-left disabled:cursor-default"
                                   aria-label={`Section ${c.name} ${s.name}${canManage ? ', edit' : ''}`}
                                 >
@@ -471,14 +510,14 @@ export function ClassesPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => setOpen({ kind: 'section', cls: c, section: null })}
+                            onClick={() => setOpen({ kind: 'section', clsId: c.id, sectionId: null })}
                           >
                             Add section
                           </Button>
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => setOpen({ kind: 'subjects', cls: c })}
+                            onClick={() => setOpen({ kind: 'subjects', clsId: c.id })}
                           >
                             Subjects
                           </Button>
@@ -489,29 +528,31 @@ export function ClassesPage() {
                 ))}
               </div>
             )}
-            {open?.kind === 'class' && (
+            {open?.kind === 'class' && (open.clsId === null || openClass) && (
               <ClassDialog
-                cls={open.cls}
+                key={openClass?.version ?? 'new'}
+                cls={openClass}
                 nextOrder={(snap.classes.at(-1)?.sort_order ?? 0) + 1}
                 open
                 onOpenChange={(o) => !o && setOpen(null)}
                 onReload={reload}
               />
             )}
-            {open?.kind === 'section' && year && (
+            {open?.kind === 'section' && openClass && year && (open.sectionId === null || openSection) && (
               <SectionDialog
-                section={open.section}
-                cls={open.cls}
+                key={openSection?.version ?? 'new'}
+                section={openSection}
+                cls={openClass}
                 yearId={year.id}
-                nextOrder={sectionsOf(open.cls.id).length}
+                nextOrder={sectionsOf(openClass.id).length}
                 open
                 onOpenChange={(o) => !o && setOpen(null)}
                 onReload={reload}
               />
             )}
-            {open?.kind === 'subjects' && year && (
+            {open?.kind === 'subjects' && openClass && year && (
               <ClassSubjectsDialog
-                cls={open.cls}
+                cls={openClass}
                 yearId={year.id}
                 snapshot={snap}
                 open

@@ -15,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import type { StaffGroup } from '@/contracts/staff';
 import { handleSaveError } from '@/lib/save-feedback';
 import { useCan } from '@/lib/scope';
-import { useSaveStaffGroup, useStaffGroups } from './hooks';
+import { useSaveStaffGroup, useStaffGroups, useStaffGroupsWithSalary } from './hooks';
 
 const schema = z.object({
   name: z.string().trim().min(1, 'Enter a group name').max(80),
@@ -42,12 +42,18 @@ function GroupDialog({
   const [error, setError] = useState<unknown>(null);
   const form = useForm<Values>({
     resolver: zodResolver(schema),
-    values: group
+    defaultValues: group
       ? { name: group.name, status: group.status, default_salary_paise: group.default_monthly_salary_paise }
       : { name: '', status: 'active', default_salary_paise: null },
   });
+  const existingSalary = group?.default_monthly_salary_paise ?? null;
   const onSubmit = form.handleSubmit(async (v) => {
     setError(null);
+    // The server keeps the old default when none is sent; it cannot clear one (save_staff_group).
+    if (canEditSalary && existingSalary !== null && v.default_salary_paise === null) {
+      form.setError('default_salary_paise', { message: 'To change it, enter a new amount.' });
+      return;
+    }
     const salaryChanged =
       canEditSalary && v.default_salary_paise !== (group?.default_monthly_salary_paise ?? null);
     try {
@@ -92,9 +98,11 @@ function GroupDialog({
                 name="default_salary_paise"
                 label="Default monthly salary"
                 description={
-                  canEditSalary
-                    ? 'Used when a staff member has no own rate. Confidential.'
-                    : 'Read-only for your role.'
+                  !canEditSalary
+                    ? 'Read-only for your role.'
+                    : existingSalary !== null
+                      ? 'Used when a staff member has no own rate. Confidential. It can be changed but not removed.'
+                      : 'Used when a staff member has no own rate. Confidential.'
                 }
                 disabled={!canEditSalary}
               />
@@ -118,8 +126,13 @@ function GroupDialog({
 export function StaffGroupsPage() {
   const canManage = useCan('setup.manage');
   const canSeeSalary = useCan('staff_finance.read');
-  const groups = useStaffGroups(true, true);
-  const [editing, setEditing] = useState<StaffGroup | null>(null);
+  // Finance roles read the salary through its own finance-scoped query; everyone else the shared one.
+  const plain = useStaffGroups(!canSeeSalary, true);
+  const withSalary = useStaffGroupsWithSalary(canSeeSalary, true);
+  const groups = canSeeSalary ? withSalary : plain;
+  // Keep only the id: the dialog reads the latest row and is keyed on its version (CONFLICT → refetch → fresh form).
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const editing = groups.data?.find((g) => g.id === editingId) ?? null;
   const [open, setOpen] = useState(false);
   return (
     <div className="space-y-4">
@@ -128,7 +141,7 @@ export function StaffGroupsPage() {
           <Button
             size="sm"
             onClick={() => {
-              setEditing(null);
+              setEditingId(null);
               setOpen(true);
             }}
           >
@@ -167,7 +180,7 @@ export function StaffGroupsPage() {
                         size="sm"
                         variant="outline"
                         onClick={() => {
-                          setEditing(g);
+                          setEditingId(g.id);
                           setOpen(true);
                         }}
                       >
@@ -181,8 +194,14 @@ export function StaffGroupsPage() {
           </Table>
         )}
       </DataState>
-      {open && (
-        <GroupDialog group={editing} open onOpenChange={setOpen} onReload={() => void groups.refetch()} />
+      {open && (editingId === null || editing) && (
+        <GroupDialog
+          key={editing?.version ?? 'new'}
+          group={editing}
+          open
+          onOpenChange={setOpen}
+          onReload={() => void groups.refetch()}
+        />
       )}
     </div>
   );

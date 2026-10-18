@@ -62,7 +62,7 @@ function ScheduleSelect({
 }
 
 // ------------------------------------------------------------------ weekly pattern editor
-function PatternDialog({
+export function PatternDialog({
   calendar,
   snapshot,
   yearId,
@@ -82,7 +82,7 @@ function PatternDialog({
   const save = useSaveCalendarPattern();
   const [error, setError] = useState<unknown>(null);
   // Rows for this audience/group; for a group, start from its own rows, else the school default.
-  const [rows, setRows] = useState(() =>
+  const [initial] = useState(() =>
     WEEKDAYS.map((w) => {
       const own = calendar.patterns.find((p) => p.weekday === w.iso && p.staff_group_id === staffGroupId);
       const fallback = calendar.patterns.find((p) => p.weekday === w.iso && p.staff_group_id === null);
@@ -92,9 +92,17 @@ function PatternDialog({
         day_type: (p?.day_type ??
           (w.iso === 7 ? 'weekly_off' : 'working')) as (typeof PATTERN_DAY_TYPES)[number],
         period_schedule_id: p?.period_schedule_id ?? null,
+        inherited: staffGroupId !== null && !own,
       };
     }),
   );
+  const [rows, setRows] = useState(initial);
+  const isChanged = (i: number) =>
+    rows[i]!.day_type !== initial[i]!.day_type ||
+    rows[i]!.period_schedule_id !== initial[i]!.period_schedule_id;
+  // A staff group saves only the weekdays changed here; the rest keep following the school default.
+  // The school default itself saves the whole week.
+  const toSave = rows.filter((_, i) => staffGroupId === null || isChanged(i));
   // Student half days need a bell schedule (SQL check on calendar_patterns).
   const missing = rows.some(
     (r) => audience === 'student' && r.day_type === 'half_day' && !r.period_schedule_id,
@@ -108,6 +116,8 @@ function PatternDialog({
           <DialogDescription>
             The usual week for {audience === 'student' ? 'students' : 'staff'}. Holidays are set as date
             ranges, not here.
+            {staffGroupId !== null &&
+              ' Only the days you change are saved for this group; the others follow the school default.'}
           </DialogDescription>
         </DialogHeader>
         <ul className="space-y-2">
@@ -118,7 +128,14 @@ function PatternDialog({
                 key={w.iso}
                 className="grid grid-cols-[6rem_1fr] items-center gap-2 sm:grid-cols-[6rem_9rem_1fr]"
               >
-                <span className="font-medium">{w.long}</span>
+                <span>
+                  <span className="block font-medium">{w.long}</span>
+                  {staffGroupId !== null && (
+                    <span className="text-muted-foreground block text-xs">
+                      {isChanged(i) ? 'Changed' : r.inherited ? 'School default' : 'Set for this group'}
+                    </span>
+                  )}
+                </span>
                 <Select
                   value={r.day_type}
                   onValueChange={(v) =>
@@ -165,12 +182,17 @@ function PatternDialog({
             disabled={save.isPending || missing}
             onClick={async () => {
               setError(null);
+              if (toSave.length === 0) {
+                toast.info('No changes to save.');
+                onOpenChange(false);
+                return;
+              }
               try {
                 await save.mutateAsync({
                   yearId,
                   audience,
                   staffGroupId,
-                  patterns: rows.map((r) => ({
+                  patterns: toSave.map((r) => ({
                     weekday: r.weekday,
                     day_type: r.day_type,
                     period_schedule_id: r.day_type === 'weekly_off' ? null : r.period_schedule_id,

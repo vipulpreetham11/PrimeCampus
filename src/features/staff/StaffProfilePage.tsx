@@ -19,7 +19,8 @@ const GENDER = { male: 'Male', female: 'Female', transgender: 'Transgender' } as
 function TeachingCard({ staffId }: { staffId: string }) {
   const canManage = useCan('timetable.manage');
   const [showEnded, setShowEnded] = useState(false);
-  const query = useTeachingAssignments({ staffId, activeOn: showEnded ? null : schoolToday() });
+  // Current and upcoming (starting later); with the switch, ended ones too.
+  const query = useTeachingAssignments({ staffId, notEndedOn: showEnded ? null : schoolToday() });
   const snapshot = useSetupSnapshot(null);
   const staff = useStaffList(null, false);
   const [adding, setAdding] = useState(false);
@@ -42,7 +43,7 @@ function TeachingCard({ staffId }: { staffId: string }) {
         <AssignmentList
           query={query}
           show="staff"
-          emptyText={showEnded ? 'No assignments' : 'No current assignments'}
+          emptyText={showEnded ? 'No assignments' : 'No current or upcoming assignments'}
         />
       </CardContent>
       {adding && snapshot.data && (

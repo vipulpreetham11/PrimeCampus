@@ -12,6 +12,8 @@ import {
   saveStaffGroup,
   saveTeachingAssignment,
 } from '@/lib/rpc';
+import { compareIsoDates } from '@/lib/dates';
+import { routeId } from '@/lib/errors';
 import { useScopedKey } from '@/lib/scope';
 
 // Staff data (brief §2). Confidential finance uses its own key ('staff-finance') so it is never
@@ -19,13 +21,31 @@ import { useScopedKey } from '@/lib/scope';
 
 const DIRECTORY = 60_000; // TRD §18: directories one minute
 
+/**
+ * Staff groups for general screens (directory filter, staff form, calendars). The salary default is
+ * stripped before caching, so this shared key never holds confidential pay — even for finance roles.
+ */
 export function useStaffGroups(enabled = true, includeRetired = false) {
   const key = useScopedKey();
   return useQuery({
     queryKey: key('staff-groups', includeRetired),
-    queryFn: ({ signal }) => listStaffGroups({ p_include_retired: includeRetired }, { signal }),
+    queryFn: ({ signal }) =>
+      listStaffGroups({ p_include_retired: includeRetired }, { signal }).then((rows) =>
+        rows.map((g) => ({ ...g, default_monthly_salary_paise: null })),
+      ),
     enabled,
     staleTime: DIRECTORY,
+  });
+}
+
+/** Staff groups WITH the default salary: own finance-scoped key, dropped as soon as unused. */
+export function useStaffGroupsWithSalary(enabled: boolean, includeRetired = false) {
+  const key = useScopedKey();
+  return useQuery({
+    queryKey: key('staff-groups-finance', includeRetired),
+    queryFn: ({ signal }) => listStaffGroups({ p_include_retired: includeRetired }, { signal }),
+    enabled,
+    gcTime: 0,
   });
 }
 
@@ -46,11 +66,15 @@ export function useSaveStaffGroup() {
         ...(v.default_salary_paise !== null ? { p_default_salary_paise: v.default_salary_paise } : {}),
         ...(v.id ? { p_id: v.id, p_expected_version: v.version } : {}),
       }),
-    onSettled: () => qc.invalidateQueries({ queryKey: key('staff-groups') }),
+    onSettled: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: key('staff-groups') }),
+        qc.invalidateQueries({ queryKey: key('staff-groups-finance') }),
+      ]),
   });
 }
 
-export function useStaffList(groupId: string | null, includeInactive: boolean) {
+export function useStaffList(groupId: string | null, includeInactive: boolean, enabled = true) {
   const key = useScopedKey();
   return useQuery({
     queryKey: key('staff-list', groupId, includeInactive),
@@ -59,6 +83,7 @@ export function useStaffList(groupId: string | null, includeInactive: boolean) {
         { p_include_inactive: includeInactive, ...(groupId ? { p_staff_group_id: groupId } : {}) },
         { signal },
       ),
+    enabled,
     staleTime: DIRECTORY,
   });
 }
@@ -67,7 +92,7 @@ export function useStaffRecord(staffId: string | undefined) {
   const key = useScopedKey();
   return useQuery({
     queryKey: key('staff', staffId),
-    queryFn: ({ signal }) => getStaff({ p_staff_id: staffId! }, { signal }),
+    queryFn: ({ signal }) => getStaff({ p_staff_id: routeId(staffId) }, { signal }),
     enabled: !!staffId,
     staleTime: DIRECTORY,
   });
@@ -143,8 +168,11 @@ export function useTeachingAssignments(filter: {
   sectionId?: string | null;
   staffId?: string | null;
   activeOn?: string | null;
+  /** Keep only assignments not ended on this date: current AND starting later (client-side filter). */
+  notEndedOn?: string | null;
 }) {
   const key = useScopedKey();
+  const notEndedOn = filter.notEndedOn ?? null;
   return useQuery({
     queryKey: key(
       'teaching',
@@ -163,6 +191,10 @@ export function useTeachingAssignments(filter: {
         },
         { signal },
       ),
+    select: notEndedOn
+      ? (rows) =>
+          rows.filter((a) => a.effective_to === null || compareIsoDates(a.effective_to, notEndedOn) > 0)
+      : undefined,
     staleTime: DIRECTORY,
   });
 }

@@ -53,7 +53,7 @@ function YearDialog({
   const [error, setError] = useState<unknown>(null);
   const form = useForm<Values>({
     resolver: zodResolver(schema),
-    values: year
+    defaultValues: year
       ? { name: year.name, start_date: year.start_date, end_date: year.end_date }
       : { name: '', start_date: '', end_date: '' },
   });
@@ -103,7 +103,9 @@ export function YearsPage() {
   const query = useSetupSnapshot(null);
   const canManage = useCan('setup.manage');
   const setCurrent = useSetCurrentYear();
-  const [editing, setEditing] = useState<AcademicYearRow | null>(null);
+  // Keep only the id: the dialog reads the latest row and is keyed on its version (CONFLICT → refetch → fresh form).
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const editing = query.data?.academic_years.find((y) => y.id === editingId) ?? null;
   const [dialogOpen, setDialogOpen] = useState(false);
   const [confirm, setConfirm] = useState<AcademicYearRow | null>(null);
   const [error, setError] = useState<unknown>(null);
@@ -116,7 +118,7 @@ export function YearsPage() {
           <Button
             size="sm"
             onClick={() => {
-              setEditing(null);
+              setEditingId(null);
               setDialogOpen(true);
             }}
           >
@@ -163,7 +165,7 @@ export function YearsPage() {
                             size="sm"
                             variant="outline"
                             onClick={() => {
-                              setEditing(y);
+                              setEditingId(y.id);
                               setDialogOpen(true);
                             }}
                           >
@@ -184,12 +186,15 @@ export function YearsPage() {
           )}
         </DataState>
       </CardContent>
-      <YearDialog
-        year={editing}
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        onReload={() => void query.refetch()}
-      />
+      {dialogOpen && (editingId === null || editing) && (
+        <YearDialog
+          key={editing?.version ?? 'new'}
+          year={editing}
+          open
+          onOpenChange={setDialogOpen}
+          onReload={() => void query.refetch()}
+        />
+      )}
       <ConfirmDialog
         open={confirm !== null}
         onOpenChange={(o) => !o && setConfirm(null)}

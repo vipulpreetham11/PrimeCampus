@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { schoolToday } from '@/lib/dates';
+import { compareIsoDates, schoolToday } from '@/lib/dates';
 import { useCan } from '@/lib/scope';
 import { useSetupSnapshot } from '@/features/setup/hooks';
 import { AssignmentDialog, AssignmentList, sectionOptions } from './TeachingAssignments';
@@ -16,7 +16,9 @@ export function TeachingBySectionPage() {
   const canManage = useCan('timetable.manage');
   const [sectionId, setSectionId] = useState<string | null>(null);
   const staff = useStaffList(null, false);
-  const query = useTeachingAssignments({ sectionId, activeOn: schoolToday() });
+  const today = schoolToday();
+  // Current and upcoming assignments (an upcoming one shows "Starts <date>").
+  const query = useTeachingAssignments({ sectionId, notEndedOn: today });
   const [adding, setAdding] = useState(false);
 
   return (
@@ -24,7 +26,9 @@ export function TeachingBySectionPage() {
       {(snap) => {
         const options = sectionOptions(snap);
         const rows = query.data ?? [];
-        const classTeacher = rows.find((r) => r.kind === 'class_teacher');
+        const classTeacher = rows.find(
+          (r) => r.kind === 'class_teacher' && compareIsoDates(r.effective_from, today) <= 0,
+        );
         return (
           <div className="space-y-4">
             <div className="flex flex-wrap items-end gap-3">
@@ -53,7 +57,7 @@ export function TeachingBySectionPage() {
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base">
-                    {options.find((o) => o.value === sectionId)?.label} — teachers today
+                    {options.find((o) => o.value === sectionId)?.label} — current and upcoming teachers
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3 text-sm">
@@ -70,7 +74,7 @@ export function TeachingBySectionPage() {
                   <AssignmentList
                     query={query}
                     show="section"
-                    emptyText="No teachers assigned to this section today"
+                    emptyText="No current or upcoming teachers for this section"
                   />
                 </CardContent>
               </Card>
