@@ -18,10 +18,16 @@ export const cancelPaidLeave = (args: SchoolArgs<'cancel_paid_leave'>, options?:
   schoolRpc('cancel_paid_leave', args, options);
 export const clearCheque = (args: SchoolArgs<'clear_cheque'>, options?: RpcOptions) =>
   schoolRpc('clear_cheque', args, options);
+export const closeImport = (args: SchoolArgs<'close_import'>, options?: RpcOptions) =>
+  schoolRpc('close_import', args, options);
+export const commitImportChunk = (args: SchoolArgs<'commit_import_chunk'>, options?: RpcOptions) =>
+  schoolRpc('commit_import_chunk', args, options);
 export const copyTimetable = (args: SchoolArgs<'copy_timetable'>, options?: RpcOptions) =>
   schoolRpc('copy_timetable', args, options);
 export const disableMembership = (args: SchoolArgs<'disable_membership'>, options?: RpcOptions) =>
   schoolRpc('disable_membership', args, options);
+export const discardTimetableDraft = (args: SchoolArgs<'discard_timetable_draft'>, options?: RpcOptions) =>
+  schoolRpc('discard_timetable_draft', args, options);
 export const endAppSession = (options?: RpcOptions) => callRpc('end_app_session', undefined, options);
 export const endTeachingAssignment = (args: SchoolArgs<'end_teaching_assignment'>, options?: RpcOptions) =>
   schoolRpc('end_teaching_assignment', args, options);
@@ -40,6 +46,8 @@ export const getCollectionReport = (args: SchoolArgs<'get_collection_report'>, o
 export const getContext = (options?: RpcOptions) => callRpc('get_context', undefined, options);
 export const getDateSchedule = (args: SchoolArgs<'get_date_schedule'>, options?: RpcOptions) =>
   schoolRpc('get_date_schedule', args, options);
+export const getDiaryEntry = (args: SchoolArgs<'get_diary_entry'>, options?: RpcOptions) =>
+  schoolRpc('get_diary_entry', args, options);
 export const getDuesReport = (args: SchoolArgs<'get_dues_report'> = {}, options?: RpcOptions) =>
   schoolRpc('get_dues_report', args, options);
 export const getFollowupsDue = (args: SchoolArgs<'get_followups_due'> = {}, options?: RpcOptions) =>
@@ -48,6 +56,10 @@ export const getGuardian = (args: SchoolArgs<'get_guardian'>, options?: RpcOptio
   schoolRpc('get_guardian', args, options);
 export const getHomeworkRoster = (args: SchoolArgs<'get_homework_roster'>, options?: RpcOptions) =>
   schoolRpc('get_homework_roster', args, options);
+export const getImportJob = (args: SchoolArgs<'get_import_job'>, options?: RpcOptions) =>
+  schoolRpc('get_import_job', args, options);
+export const getImportTemplate = (args: SchoolArgs<'get_import_template'>, options?: RpcOptions) =>
+  schoolRpc('get_import_template', args, options);
 export const getLead = (args: SchoolArgs<'get_lead'>, options?: RpcOptions) =>
   schoolRpc('get_lead', args, options);
 export const getMarkingRoster = (args: SchoolArgs<'get_marking_roster'>, options?: RpcOptions) =>
@@ -58,18 +70,28 @@ export const getSalaryCalculations = (
   args: SchoolArgs<'get_salary_calculations'> = {},
   options?: RpcOptions,
 ) => schoolRpc('get_salary_calculations', args, options);
+export const getScheduleRange = (args: SchoolArgs<'get_schedule_range'>, options?: RpcOptions) =>
+  schoolRpc('get_schedule_range', args, options);
 export const getSchoolProfile = (args: SchoolArgs<'get_school_profile'> = {}, options?: RpcOptions) =>
   schoolRpc('get_school_profile', args, options);
 export const getSetupSnapshot = (args: SchoolArgs<'get_setup_snapshot'> = {}, options?: RpcOptions) =>
   schoolRpc('get_setup_snapshot', args, options);
 export const getStaff = (args: SchoolArgs<'get_staff'>, options?: RpcOptions) =>
   schoolRpc('get_staff', args, options);
+export const getStaffAttendance = (args: SchoolArgs<'get_staff_attendance'>, options?: RpcOptions) =>
+  schoolRpc('get_staff_attendance', args, options);
 export const getStaffConfidential = (args: SchoolArgs<'get_staff_confidential'>, options?: RpcOptions) =>
   schoolRpc('get_staff_confidential', args, options);
+export const getStudentAttendanceRecords = (
+  args: SchoolArgs<'get_student_attendance_records'>,
+  options?: RpcOptions,
+) => schoolRpc('get_student_attendance_records', args, options);
 export const getStudentAttendanceSummary = (
   args: SchoolArgs<'get_student_attendance_summary'>,
   options?: RpcOptions,
 ) => schoolRpc('get_student_attendance_summary', args, options);
+export const getStudentDiary = (args: SchoolArgs<'get_student_diary'>, options?: RpcOptions) =>
+  schoolRpc('get_student_diary', args, options);
 export const getStudentHomework = (args: SchoolArgs<'get_student_homework'>, options?: RpcOptions) =>
   schoolRpc('get_student_homework', args, options);
 export const getStudentProfile = (args: SchoolArgs<'get_student_profile'>, options?: RpcOptions) =>
@@ -78,6 +100,8 @@ export const getStudentStatement = (args: SchoolArgs<'get_student_statement'>, o
   schoolRpc('get_student_statement', args, options);
 export const getTeacherToday = (args: SchoolArgs<'get_teacher_today'> = {}, options?: RpcOptions) =>
   schoolRpc('get_teacher_today', args, options);
+export const getTimetableVersion = (args: SchoolArgs<'get_timetable_version'>, options?: RpcOptions) =>
+  schoolRpc('get_timetable_version', args, options);
 export const grantConcession = (args: SchoolArgs<'grant_concession'>, options?: RpcOptions) =>
   schoolRpc('grant_concession', args, options);
 export const grantMembership = (args: SchoolArgs<'grant_membership'>, options?: RpcOptions) =>
@@ -90,6 +114,12 @@ export const linkAccount = (args: SchoolArgs<'link_account'>, options?: RpcOptio
   schoolRpc('link_account', args, options);
 export const listClassSubjects = (args: SchoolArgs<'list_class_subjects'>, options?: RpcOptions) =>
   schoolRpc('list_class_subjects', args, options);
+export const listDiaryEntries = (args: SchoolArgs<'list_diary_entries'>, options?: RpcOptions) =>
+  schoolRpc('list_diary_entries', args, options);
+export const listHomework = (args: SchoolArgs<'list_homework'>, options?: RpcOptions) =>
+  schoolRpc('list_homework', args, options);
+export const listImportJobs = (args: SchoolArgs<'list_import_jobs'> = {}, options?: RpcOptions) =>
+  schoolRpc('list_import_jobs', args, options);
 export const listLeads = (args: SchoolArgs<'list_leads'> = {}, options?: RpcOptions) =>
   schoolRpc('list_leads', args, options);
 export const listSchoolUsers = (args: SchoolArgs<'list_school_users'> = {}, options?: RpcOptions) =>
@@ -100,10 +130,14 @@ export const listStaffGroups = (args: SchoolArgs<'list_staff_groups'> = {}, opti
   schoolRpc('list_staff_groups', args, options);
 export const listStudents = (args: SchoolArgs<'list_students'> = {}, options?: RpcOptions) =>
   schoolRpc('list_students', args, options);
+export const listSubstitutions = (args: SchoolArgs<'list_substitutions'>, options?: RpcOptions) =>
+  schoolRpc('list_substitutions', args, options);
 export const listTeachingAssignments = (
   args: SchoolArgs<'list_teaching_assignments'> = {},
   options?: RpcOptions,
 ) => schoolRpc('list_teaching_assignments', args, options);
+export const listTimetableVersions = (args: SchoolArgs<'list_timetable_versions'>, options?: RpcOptions) =>
+  schoolRpc('list_timetable_versions', args, options);
 export const markHomeworkChecks = (args: SchoolArgs<'mark_homework_checks'>, options?: RpcOptions) =>
   schoolRpc('mark_homework_checks', args, options);
 export const markStaffAttendance = (args: SchoolArgs<'mark_staff_attendance'>, options?: RpcOptions) =>
@@ -209,10 +243,18 @@ export const setAttendanceMode = (args: SchoolArgs<'set_attendance_mode'>, optio
   schoolRpc('set_attendance_mode', args, options);
 export const setCurrentYear = (args: SchoolArgs<'set_current_year'>, options?: RpcOptions) =>
   schoolRpc('set_current_year', args, options);
+export const setImportRowRemoved = (args: SchoolArgs<'set_import_row_removed'>, options?: RpcOptions) =>
+  schoolRpc('set_import_row_removed', args, options);
 export const setOptionalFee = (args: SchoolArgs<'set_optional_fee'>, options?: RpcOptions) =>
   schoolRpc('set_optional_fee', args, options);
+export const stageImportRows = (args: SchoolArgs<'stage_import_rows'>, options?: RpcOptions) =>
+  schoolRpc('stage_import_rows', args, options);
+export const startImport = (args: SchoolArgs<'start_import'>, options?: RpcOptions) =>
+  schoolRpc('start_import', args, options);
 export const suggestSubstitutes = (args: SchoolArgs<'suggest_substitutes'>, options?: RpcOptions) =>
   schoolRpc('suggest_substitutes', args, options);
+export const updateImportRow = (args: SchoolArgs<'update_import_row'>, options?: RpcOptions) =>
+  schoolRpc('update_import_row', args, options);
 export const updateLessonSession = (args: SchoolArgs<'update_lesson_session'>, options?: RpcOptions) =>
   schoolRpc('update_lesson_session', args, options);
 export const updateStudent = (args: SchoolArgs<'update_student'>, options?: RpcOptions) =>
@@ -220,7 +262,7 @@ export const updateStudent = (args: SchoolArgs<'update_student'>, options?: RpcO
 export const waiveLateFee = (args: SchoolArgs<'waive_late_fee'>, options?: RpcOptions) =>
   schoolRpc('waive_late_fee', args, options);
 
-/** RPCs that take p_ctx_rev (95). */
+/** RPCs that take p_ctx_rev (115). */
 export const SCHOOL_RPCS = [
   'activate_timetable',
   'add_invoice_adjustment',
@@ -229,8 +271,11 @@ export const SCHOOL_RPCS = [
   'bounce_cheque',
   'cancel_paid_leave',
   'clear_cheque',
+  'close_import',
+  'commit_import_chunk',
   'copy_timetable',
   'disable_membership',
+  'discard_timetable_draft',
   'end_teaching_assignment',
   'evaluate_late_fees',
   'find_school_account',
@@ -239,35 +284,48 @@ export const SCHOOL_RPCS = [
   'get_calendar',
   'get_collection_report',
   'get_date_schedule',
+  'get_diary_entry',
   'get_dues_report',
   'get_followups_due',
   'get_guardian',
   'get_homework_roster',
+  'get_import_job',
+  'get_import_template',
   'get_lead',
   'get_marking_roster',
   'get_receipt',
   'get_salary_calculations',
+  'get_schedule_range',
   'get_school_profile',
   'get_setup_snapshot',
   'get_staff',
+  'get_staff_attendance',
   'get_staff_confidential',
+  'get_student_attendance_records',
   'get_student_attendance_summary',
+  'get_student_diary',
   'get_student_homework',
   'get_student_profile',
   'get_student_statement',
   'get_teacher_today',
+  'get_timetable_version',
   'grant_concession',
   'grant_membership',
   'issue_opening_balance',
   'issue_term_invoices',
   'link_account',
   'list_class_subjects',
+  'list_diary_entries',
+  'list_homework',
+  'list_import_jobs',
   'list_leads',
   'list_school_users',
   'list_staff',
   'list_staff_groups',
   'list_students',
+  'list_substitutions',
   'list_teaching_assignments',
+  'list_timetable_versions',
   'mark_homework_checks',
   'mark_staff_attendance',
   'mark_student_attendance',
@@ -312,8 +370,12 @@ export const SCHOOL_RPCS = [
   'set_admissions_duty',
   'set_attendance_mode',
   'set_current_year',
+  'set_import_row_removed',
   'set_optional_fee',
+  'stage_import_rows',
+  'start_import',
   'suggest_substitutes',
+  'update_import_row',
   'update_lesson_session',
   'update_student',
   'waive_late_fee',
