@@ -60,7 +60,8 @@ describe('context revision', () => {
     onRpc(() => ({ data: {} }));
     for (const name of rpc.SCHOOL_RPCS) {
       const wrapper = (rpc as unknown as Record<string, (a: object) => Promise<unknown>>)[camel(name)]!;
-      await wrapper({});
+      // responses here are placeholders; only the request shape matters
+      await wrapper({}).catch(() => undefined);
     }
     expect(rpcCalls).toHaveLength(rpc.SCHOOL_RPCS.length);
     for (const call of rpcCalls) expect(call.args?.p_ctx_rev).toBe(7);

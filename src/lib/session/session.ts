@@ -291,3 +291,16 @@ export async function changePassword(currentPassword: string, newPassword: strin
     await loadBootstrap();
   }
 }
+
+/**
+ * Re-read get_context without switching (e.g. setup changed the school's current year, which the
+ * header shows). The revision is unchanged, so caches stay; a different revision is left to the
+ * normal STALE_CONTEXT path.
+ */
+export async function reloadContext(): Promise<void> {
+  const context = await getContext({ detached: true, silent: true });
+  const s = sessionStore.get();
+  if (s.status === 'ready' && s.context?.context_revision === context.context_revision) {
+    sessionStore.set({ context });
+  }
+}

@@ -1,6 +1,7 @@
 // Capability names returned by get_context().capabilities (migration 0900/0800, private.role_has_cap).
 // UI visibility is derived from these only — never from role names (CLAUDE.md rule 11).
 export const CAPABILITIES = [
+  'staff.member',
   'setup.manage',
   'users.manage',
   'students.read_all',

@@ -1,6 +1,22 @@
 import { useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router';
-import { ArrowLeftRight, LayoutDashboard, LogOut, KeyRound, Menu, School, UserRound, X } from 'lucide-react';
+import {
+  ArrowLeftRight,
+  Briefcase,
+  CalendarDays,
+  ClipboardList,
+  GraduationCap,
+  KeyRound,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  School,
+  Settings,
+  UserRound,
+  Users,
+  X,
+  type LucideIcon,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -16,7 +32,26 @@ import { roleLabel } from '@/contracts/roles';
 import { logout } from '@/lib/session/session';
 import { sessionStore, useSession, type SessionState } from '@/lib/session/store';
 import { cn } from '@/lib/utils';
-import { buildNav, type NavItem } from '../navigation';
+import { buildNav, type NavIcon, type NavItem } from '../navigation';
+
+const ICONS: Record<NavIcon, LucideIcon> = {
+  dashboard: LayoutDashboard,
+  setup: Settings,
+  calendar: CalendarDays,
+  students: GraduationCap,
+  admissions: ClipboardList,
+  staff: Briefcase,
+  users: Users,
+  operator: School,
+};
+
+function NavIconView({ icon, className }: { icon: NavIcon; className: string }) {
+  const Icon = ICONS[icon];
+  return <Icon aria-hidden="true" className={className} />;
+}
+
+/** Phones: this many destinations in the bottom bar; the rest are in the menu. */
+const BOTTOM_BAR_ITEMS = 3;
 
 function childName(s: SessionState): string | null {
   const id = s.context?.student_id;
@@ -89,11 +124,7 @@ function NavList({ items, onNavigate }: { items: NavItem[]; onNavigate?: () => v
             >
               {({ isActive }) => (
                 <>
-                  {item.to === '/dashboard' ? (
-                    <LayoutDashboard className="size-4" />
-                  ) : (
-                    <School className="size-4" />
-                  )}
+                  <NavIconView icon={item.icon} className="size-4" />
                   {item.label}
                   {isActive && <span className="sr-only">(current page)</span>}
                 </>
@@ -226,11 +257,11 @@ export function AppShell() {
         </main>
       </div>
 
-      {/* Bottom navigation for phones: live destinations only. */}
+      {/* Bottom navigation for phones: the first few live destinations, the rest under "More". */}
       {liveItems.length > 0 && (
         <nav aria-label="Quick" className="bg-background fixed inset-x-0 bottom-0 z-30 border-t md:hidden">
           <ul className="flex">
-            {liveItems.map((item) => (
+            {liveItems.slice(0, BOTTOM_BAR_ITEMS).map((item) => (
               <li key={item.to} className="flex-1">
                 <NavLink
                   to={item.to}
@@ -241,15 +272,23 @@ export function AppShell() {
                     )
                   }
                 >
-                  {item.to === '/dashboard' ? (
-                    <LayoutDashboard className="size-5" />
-                  ) : (
-                    <School className="size-5" />
-                  )}
+                  <NavIconView icon={item.icon} className="size-5" />
                   {item.label}
                 </NavLink>
               </li>
             ))}
+            {liveItems.length > BOTTOM_BAR_ITEMS && (
+              <li className="flex-1">
+                <button
+                  type="button"
+                  onClick={() => setMenuOpen(true)}
+                  className="text-muted-foreground flex w-full flex-col items-center gap-0.5 py-2 text-xs"
+                >
+                  <Menu aria-hidden="true" className="size-5" />
+                  More
+                </button>
+              </li>
+            )}
           </ul>
         </nav>
       )}

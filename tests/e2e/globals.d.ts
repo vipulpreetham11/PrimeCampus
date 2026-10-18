@@ -6,6 +6,7 @@ declare global {
       revision: () => number | null;
       forceStaleRevision: () => void;
       probeSchoolRpc: () => Promise<string>;
+      cachedQueryKeys: () => unknown[][];
     };
   }
 }

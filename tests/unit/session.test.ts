@@ -1,5 +1,14 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { bootstrapRow, contextRow, fakeSupabase, ids, onRpc, resetFake, rpcCalls } from './fake-supabase';
+import {
+  bootstrapRow,
+  contextRow,
+  fakeSupabase,
+  ids,
+  onRpc,
+  resetFake,
+  rpcCalls,
+  setupSnapshotRow,
+} from './fake-supabase';
 
 vi.mock('@/lib/supabase', () => ({ supabase: fakeSupabase }));
 
@@ -129,7 +138,7 @@ describe('STALE_CONTEXT', () => {
     onRpc((fn, args) => {
       if (fn === 'get_setup_snapshot') {
         return args?.p_ctx_rev === 11
-          ? { data: { ok: true } }
+          ? { data: setupSnapshotRow() }
           : {
               error: {
                 code: 'P0001',
@@ -151,7 +160,7 @@ describe('STALE_CONTEXT', () => {
     );
     expect(queryClient.getQueryData(key)).toBeUndefined();
     // recovered: the next call uses the server's revision and succeeds
-    await expect(rpc.getSetupSnapshot()).resolves.toEqual({ ok: true });
+    await expect(rpc.getSetupSnapshot()).resolves.toMatchObject({ attendance_mode_today: 'daily' });
     expect(rpcCalls.at(-1)?.args?.p_ctx_rev).toBe(11);
   });
 

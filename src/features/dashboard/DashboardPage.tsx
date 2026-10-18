@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { Role } from '@/contracts/roles';
 import { useSession } from '@/lib/session/store';
+import { buildNav } from '@/app/navigation';
 
 // Placeholder per role dashboard (M0). No fake buttons or numbers (PRD §15): each page states
 // which module delivers it. Choosing the *text* by role is presentation only — access is
@@ -20,7 +21,6 @@ const PLACEHOLDERS: Record<Role, Placeholder> = {
     title: 'Operator overview',
     module: 'M4',
     upcoming: [
-      { label: 'School setup, staff, users, students and admissions', module: 'M1' },
       { label: 'Timetable, attendance, diary and homework', module: 'M2' },
       { label: 'Fees and receipts', module: 'M3' },
       { label: 'Activity, authentication and usage logs', module: 'M4' },
@@ -30,7 +30,6 @@ const PLACEHOLDERS: Record<Role, Placeholder> = {
     title: 'Admin operations dashboard',
     module: 'M4',
     upcoming: [
-      { label: 'School setup, staff, users, students and admissions', module: 'M1' },
       { label: 'Timetable, attendance, diary and homework', module: 'M2' },
       { label: 'Fees configuration, invoices, collections and receipts', module: 'M3' },
       { label: 'Staff attendance and salary calculator', module: 'M4' },
@@ -87,6 +86,10 @@ export function DashboardPage() {
   const ctx = s.context;
   if (!ctx) return null; // the route gate sends users without a context to the chooser
   const p = PLACEHOLDERS[ctx.role];
+  // Same capability-driven list as the sidebar (never role names).
+  const available = buildNav(ctx, s.account?.isOperator ?? false).filter(
+    (i): i is Extract<typeof i, { kind: 'live' }> => i.kind === 'live' && i.to !== '/dashboard',
+  );
 
   return (
     <div data-testid={`dashboard-${ctx.role}`}>
@@ -110,10 +113,19 @@ export function DashboardPage() {
               </li>
             ))}
           </ul>
-          {s.account?.isOperator && (
-            <Button asChild variant="outline">
-              <Link to="/operator/onboarding">School onboarding</Link>
-            </Button>
+          {available.length > 0 && (
+            <div>
+              <p className="mb-2 font-medium">Available now</p>
+              <ul className="flex flex-wrap gap-2" aria-label="Available now">
+                {available.map((item) => (
+                  <li key={item.to}>
+                    <Button asChild variant="outline" size="sm">
+                      <Link to={item.to}>{item.label}</Link>
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </CardContent>
       </Card>

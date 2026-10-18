@@ -4,10 +4,14 @@ import type { ActiveContext } from '@/contracts/session';
 // Navigation is derived from server capabilities and context fields (CLAUDE.md rule 11),
 // never from role names. Upcoming areas are listed as plain text — never clickable (PRD §15).
 
+export type NavIcon =
+  'dashboard' | 'setup' | 'calendar' | 'students' | 'admissions' | 'staff' | 'users' | 'operator';
+
 export interface LiveNavItem {
   kind: 'live';
   label: string;
   to: string;
+  icon: NavIcon;
 }
 export interface UpcomingNavItem {
   kind: 'upcoming';
@@ -24,12 +28,32 @@ interface UpcomingRule {
   studentView?: boolean;
 }
 
+interface LiveRule {
+  label: string;
+  to: string;
+  icon: NavIcon;
+  anyOf: Capability[];
+  /** Hidden when the context has any of these (e.g. "School calendar" when full setup is shown). */
+  unless?: Capability[];
+}
+
+// M1 areas (live). Order is the sidebar order; phones show the first few in the bottom bar.
+const LIVE: LiveRule[] = [
+  { label: 'Students', to: '/students', icon: 'students', anyOf: ['students.read_all'] },
+  { label: 'Admissions', to: '/admissions', icon: 'admissions', anyOf: ['admissions.manage'] },
+  { label: 'Staff', to: '/staff', icon: 'staff', anyOf: ['staff.read'] },
+  { label: 'Users & logins', to: '/users', icon: 'users', anyOf: ['users.manage'] },
+  { label: 'School setup', to: '/setup', icon: 'setup', anyOf: ['setup.manage'] },
+  {
+    label: 'School calendar',
+    to: '/setup/calendar',
+    icon: 'calendar',
+    anyOf: ['staff.member'],
+    unless: ['setup.manage'],
+  },
+];
+
 const UPCOMING: UpcomingRule[] = [
-  { label: 'School setup', module: 'M1', anyOf: ['setup.manage'] },
-  { label: 'Users', module: 'M1', anyOf: ['users.manage'] },
-  { label: 'Students', module: 'M1', anyOf: ['students.read_all', 'students.manage'] },
-  { label: 'Admissions', module: 'M1', anyOf: ['admissions.manage'] },
-  { label: 'Staff', module: 'M1', anyOf: ['staff.manage'] },
   { label: 'Timetable', module: 'M2', anyOf: ['timetable.read_all', 'timetable.manage'] },
   { label: 'Attendance', module: 'M2', anyOf: ['attendance.read_all', 'attendance.mark_any'] },
   { label: 'Diary & homework', module: 'M2', anyOf: ['academic.read_all', 'academic.correct'] },
@@ -46,10 +70,18 @@ const UPCOMING: UpcomingRule[] = [
 
 export function buildNav(context: ActiveContext | null, isOperator: boolean): NavItem[] {
   const items: NavItem[] = [];
-  if (context) items.push({ kind: 'live', label: 'Dashboard', to: '/dashboard' });
-  if (isOperator) items.push({ kind: 'live', label: 'School onboarding', to: '/operator/onboarding' });
+  if (context) items.push({ kind: 'live', label: 'Dashboard', to: '/dashboard', icon: 'dashboard' });
+  const caps = new Set(context?.capabilities ?? []);
+  if (context) {
+    for (const r of LIVE) {
+      if (r.anyOf.some((c) => caps.has(c)) && !(r.unless ?? []).some((c) => caps.has(c))) {
+        items.push({ kind: 'live', label: r.label, to: r.to, icon: r.icon });
+      }
+    }
+  }
+  if (isOperator)
+    items.push({ kind: 'live', label: 'School onboarding', to: '/operator/onboarding', icon: 'operator' });
   if (!context) return items;
-  const caps = new Set(context.capabilities);
   for (const rule of UPCOMING) {
     const byCap = rule.anyOf?.some((c) => caps.has(c)) ?? false;
     const byStudent = rule.studentView === true && context.student_id !== null;

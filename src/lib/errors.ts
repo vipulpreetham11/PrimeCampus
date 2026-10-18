@@ -69,6 +69,29 @@ function isServerCode(v: unknown): v is ServerErrorCode {
   return typeof v === 'string' && (SERVER_ERROR_CODES as readonly string[]).includes(v);
 }
 
+// Constraint violations a user can cause and fix (duplicate value, overlapping dates, a rule check).
+// Other raw SQLSTATEs (not-null, foreign key, bad cast, too long, bad date) mean the client sent
+// something it should not have — our bug — so they stay UNKNOWN: "Something went wrong" + request id.
+const CONSTRAINT_MESSAGES: Record<string, [AppErrorCode, string]> = {
+  '23505': [
+    'DUPLICATE',
+    'This already exists (for example the same name, code or number). Use a different value.',
+  ],
+  '23P01': ['VALIDATION_ERROR', 'These dates overlap an existing record. Choose dates that do not overlap.'],
+  '23514': ['VALIDATION_ERROR', 'Some values are not allowed. Check the highlighted rules and try again.'],
+};
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * An id taken from the URL. A malformed one (e.g. /students/abc) is reported as NOT_FOUND and never
+ * sent to the server, where it would fail as a raw cast error.
+ */
+export function routeId(id: string | undefined): string {
+  if (!id || !UUID_PATTERN.test(id)) throw new AppError('NOT_FOUND', SAFE_MESSAGES.NOT_FOUND, newRequestId());
+  return id;
+}
+
 const NETWORK_PATTERN = /failed to fetch|networkerror|network request failed|load failed|fetch failed/i;
 
 interface ErrorLike {
@@ -101,6 +124,12 @@ export function toAppError(err: unknown, requestId: string = newRequestId(), ser
   if (e.code === 'PGRST301' || e.code === 'PGRST302' || /jwt expired|invalid jwt/i.test(message)) {
     return new AppError('UNAUTHENTICATED', SAFE_MESSAGES.UNAUTHENTICATED, requestId);
   }
+
+  // Some invoker RPCs let table constraints raise directly (no hint). Map the SQLSTATE class to a
+  // safe, fixed message; the database text itself is never shown.
+  const sqlState = typeof e.code === 'string' ? e.code : '';
+  const constraintMessage = CONSTRAINT_MESSAGES[sqlState];
+  if (constraintMessage) return new AppError(constraintMessage[0], constraintMessage[1], requestId);
 
   const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
   if (offline || NETWORK_PATTERN.test(message) || e.name === 'FunctionsFetchError') {
