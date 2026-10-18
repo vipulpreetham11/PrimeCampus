@@ -390,11 +390,13 @@ test('4. Admin marks a teacher absent → the day view flags it → substitute a
   if (await fill.isEnabled()) await fill.click();
   const meera = page.getByTestId('staff-row').filter({ hasText: 'Meera Rao' });
   await meera.getByRole('radio', { name: 'Absent' }).click();
-  const save = page.getByRole('button', { name: /Save staff attendance/ });
-  if (await save.isEnabled()) {
-    await save.click();
-    await expect(page.getByText('Saved.')).toBeVisible({ timeout: 30_000 });
-  }
+  // one real change every run: Lata Iyer alternates between Present and Late
+  const lata = page.getByTestId('staff-row').filter({ hasText: 'Lata Iyer' });
+  const lataPresent =
+    (await lata.getByRole('radio', { name: 'Present' }).getAttribute('aria-checked')) === 'true';
+  await lata.getByRole('radio', { name: lataPresent ? 'Late' : 'Present' }).click();
+  await page.getByRole('button', { name: /Save staff attendance/ }).click();
+  await expect(page.getByText('Saved.')).toBeVisible({ timeout: 30_000 });
   await expect(meera).toHaveAttribute('data-state', 'marked');
   await expect(meera.getByRole('radio', { name: 'Absent' })).toHaveAttribute('aria-checked', 'true');
 
