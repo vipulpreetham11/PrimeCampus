@@ -102,7 +102,8 @@ export type RowError = z.infer<typeof rowErrorSchema>;
 
 export const importRowSchema = z.object({
   row_no: z.number().int(),
-  status: z.enum(['draft', 'committed', 'rejected', 'removed']),
+  // 'pending' is allowed by the table (app.import_rows) although no RPC sets it today.
+  status: z.enum(['draft', 'pending', 'committed', 'rejected', 'removed']),
   action: z.string().nullable(),
   data: z.record(z.string(), z.unknown()),
   errors: z.array(rowErrorSchema),

@@ -1,4 +1,4 @@
-import { CheckCircle2, CircleSlash, Copy, PencilLine, Trash2, XCircle } from 'lucide-react';
+import { CheckCircle2, CircleSlash, Copy, Hourglass, PencilLine, Trash2, XCircle } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { isClosedJob, type ImportCounts } from '@/contracts/imports';
@@ -84,6 +84,7 @@ const ROW_STATE_ICON: Record<RowState, LucideIcon> = {
   ready: CheckCircle2,
   will_skip: Copy,
   needs_fixing: PencilLine,
+  pending: Hourglass,
   created: CheckCircle2,
   skipped: Copy,
   rejected: XCircle,

@@ -260,6 +260,17 @@ function UploadStep({
           </span>
         </p>
       )}
+      {state.kind === 'loaded' &&
+        state.file.sheet.warnings.map((w) => (
+          <div
+            key={w}
+            role="status"
+            className="flex gap-2 rounded-md border border-amber-600/50 bg-amber-50 p-3 text-sm dark:bg-amber-950/30"
+          >
+            <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+            <p>{w}</p>
+          </div>
+        ))}
     </div>
   );
 }
@@ -372,8 +383,8 @@ export function NewImportPage() {
   // Columns are auto-matched for each (file, template) pair; the user's changes apply to that pair only.
   const templateData = template.data;
   const auto = useMemo(
-    () => (file && templateData ? autoMap(file.sheet.headers, templateData.columns) : []),
-    [file, templateData],
+    () => (file && templateData && dataset ? autoMap(file.sheet.headers, templateData.columns, dataset) : []),
+    [file, templateData, dataset],
   );
   const mapping: Mapping =
     edited && edited.file === file && edited.template === templateData ? edited.mapping : auto;
@@ -412,9 +423,21 @@ export function NewImportPage() {
     }
   };
 
+  // Rows with values only in unmapped columns are not sent.
+  const staged = useMemo(
+    () => (file ? buildStageRows(file.sheet, mapping) : { rows: [], emptyRows: [] }),
+    [file, mapping],
+  );
   const problems = templateData ? mappingProblems(mapping, templateData.columns) : ['Loading the template…'];
   const yearOk = !needsYear || !!yearId;
-  const canStart = !!dataset && !!file && !!templateData && problems.length === 0 && yearOk && !locked;
+  const canStart =
+    !!dataset &&
+    !!file &&
+    !!templateData &&
+    problems.length === 0 &&
+    yearOk &&
+    !locked &&
+    staged.rows.length > 0;
 
   const stageFrom = async (job: StartImportResult, batches: StageRow[][], from: number) => {
     const rowsBefore = (i: number) => batches.slice(0, i).reduce((n, b) => n + b.length, 0);
@@ -469,7 +492,7 @@ export function NewImportPage() {
       if (error.code !== 'CANCELLED') setUpload({ kind: 'start-failed', error });
       return;
     }
-    await stageFrom(job, batchRows(buildStageRows(file.sheet, mapping)), 0);
+    await stageFrom(job, batchRows(staged.rows), 0);
   };
 
   const resume = () => {
@@ -484,7 +507,9 @@ export function NewImportPage() {
   };
 
   const years = useMemo(() => snapshot.data?.academic_years ?? [], [snapshot.data]);
-  const totalRows = file?.sheet.rows.length ?? 0;
+  const totalRows =
+    'batches' in upload ? upload.batches.reduce((n, b) => n + b.length, 0) : staged.rows.length;
+  const skipped = staged.emptyRows;
   const job = 'job' in upload ? upload.job : null;
   const earlier = job?.same_file_before[0];
 
@@ -564,6 +589,14 @@ export function NewImportPage() {
                   : ''}
                 .
               </p>
+              {skipped.length > 0 && (
+                <p role="status" className="text-sm">
+                  {skipped.length} row{skipped.length === 1 ? '' : 's'} had no data in the mapped columns and{' '}
+                  {skipped.length === 1 ? 'was' : 'were'} skipped (row{skipped.length === 1 ? '' : 's'}{' '}
+                  {skipped.slice(0, 10).join(', ')}
+                  {skipped.length > 10 ? ` and ${skipped.length - 10} more` : ''}).
+                </p>
+              )}
               {upload.kind === 'start-failed' && <ErrorText error={upload.error} />}
               <Button onClick={() => void start()} disabled={!canStart}>
                 {upload.kind === 'starting'

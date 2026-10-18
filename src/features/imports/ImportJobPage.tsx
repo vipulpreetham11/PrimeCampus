@@ -76,6 +76,7 @@ function RowItem({
   onRemove,
   onRestore,
   restoring,
+  disabled,
 }: {
   row: ImportRow;
   job: ImportJob;
@@ -85,6 +86,8 @@ function RowItem({
   onRemove: () => void;
   onRestore: () => void;
   restoring: boolean;
+  /** An import run is in progress: rows can't be changed. */
+  disabled: boolean;
 }) {
   const recordLink = useRecordLink(job);
   const state = rowState(row);
@@ -134,17 +137,17 @@ function RowItem({
       )}
       <div className="flex flex-wrap gap-2">
         {editable && (
-          <Button size="sm" variant="outline" onClick={onEdit}>
+          <Button size="sm" variant="outline" onClick={onEdit} disabled={disabled}>
             Edit
           </Button>
         )}
         {editable && (
-          <Button size="sm" variant="outline" onClick={onRemove}>
+          <Button size="sm" variant="outline" onClick={onRemove} disabled={disabled}>
             Remove
           </Button>
         )}
         {open && row.status === 'removed' && (
-          <Button size="sm" variant="outline" onClick={onRestore} disabled={restoring}>
+          <Button size="sm" variant="outline" onClick={onRestore} disabled={restoring || disabled}>
             {restoring ? 'Restoring…' : 'Restore'}
           </Button>
         )}
@@ -171,25 +174,28 @@ function tallyText(t: CommitTally): string {
   );
 }
 
-function ImportPanel({ job }: { job: ImportJob }) {
-  const [state, setState] = useState<CommitState>({ kind: 'idle' });
-  const refreshAfterCommit = useRefreshAfterCommit();
+/** The newer of two snapshots of the same job (page refetch vs. latest commit response). */
+function newest(a: ImportJob, b: ImportJob | null): ImportJob {
+  if (!b) return a;
+  return Date.parse(b.updated_at) > Date.parse(a.updated_at) ? b : a;
+}
+
+function ImportPanel({
+  job,
+  state,
+  canCommit,
+  onRun,
+  onReload,
+}: {
+  job: ImportJob;
+  state: CommitState;
+  canCommit: boolean;
+  onRun: () => void;
+  onReload: () => void;
+}) {
   const counts = job.counts;
   const pending = pendingCount(counts);
-  const running = state.kind === 'running';
-
-  const run = async () => {
-    const total = pendingCount(counts);
-    setState({ kind: 'running', total, tally: { created: 0, skipped: 0, rejected: 0, needsFixing: 0 } });
-    const outcome = await runCommitLoop(
-      () => commitChunk(job.job_id),
-      (tally) => setState({ kind: 'running', total, tally }),
-    );
-    void refreshAfterCommit(job.job_id);
-    if (outcome.kind !== 'finished' && outcome.kind !== 'stalled' && outcome.error.code === 'CANCELLED')
-      return;
-    setState({ kind: 'ended', outcome });
-  };
+  const datasetName = datasetLabel(job.dataset).toLowerCase();
 
   const label =
     counts.ready > 0
@@ -197,26 +203,27 @@ function ImportPanel({ job }: { job: ImportJob }) {
       : counts.will_skip > 0
         ? `Confirm ${counts.will_skip.toLocaleString('en-IN')} existing row${counts.will_skip === 1 ? '' : 's'}`
         : 'Import 0 rows';
+  const hint = !canCommit
+    ? `Your role can't import ${datasetName}. Ask someone who manages them to run this import.`
+    : counts.ready > 0 && counts.will_skip > 0
+      ? `${counts.will_skip} row${counts.will_skip === 1 ? '' : 's'} that already exist will be skipped — nothing about them changes.`
+      : counts.ready === 0 && counts.will_skip > 0 && counts.needs_fixing === 0
+        ? 'These rows already exist. Confirming re-checks them; anything missing now will be created.'
+        : counts.ready === 0 && counts.will_skip > 0
+          ? 'These rows already exist. Confirming re-checks them; anything missing now will be created. Rows that need fixing are left out.'
+          : pending === 0
+            ? 'No rows are ready. Fix or restore rows first.'
+            : 'Each row is imported on its own; rows with problems are listed afterwards.';
+  const resume = state.kind === 'ended' && state.outcome.kind === 'uncertain';
 
   return (
     <div className="space-y-3">
-      {state.kind !== 'running' && !allDone(counts) && (
+      {state.kind !== 'running' && (!allDone(counts) || resume) && (
         <div className="space-y-1">
-          <Button onClick={() => void run()} disabled={pending === 0 || running}>
-            {state.kind === 'ended' &&
-            (state.outcome.kind === 'uncertain' || state.outcome.kind === 'stalled')
-              ? 'Continue'
-              : label}
+          <Button onClick={onRun} disabled={!canCommit || (pending === 0 && !resume)}>
+            {resume ? 'Continue' : label}
           </Button>
-          <p className="text-muted-foreground text-sm">
-            {counts.ready > 0 && counts.will_skip > 0
-              ? `${counts.will_skip} row${counts.will_skip === 1 ? '' : 's'} that already exist will be skipped — nothing about them changes.`
-              : counts.ready === 0 && counts.will_skip > 0
-                ? 'Every remaining row already exists: nothing will be created or changed.'
-                : pending === 0
-                  ? 'No rows are ready. Fix or restore rows first.'
-                  : 'Each row is imported on its own; rows with problems are listed afterwards.'}
-          </p>
+          <p className="text-muted-foreground text-sm">{hint}</p>
         </div>
       )}
       {state.kind === 'running' && (
@@ -229,12 +236,24 @@ function ImportPanel({ job }: { job: ImportJob }) {
           <p className="text-sm">So far: {tallyText(state.tally)}.</p>
         </div>
       )}
-      {state.kind === 'ended' && <CommitResult outcome={state.outcome} counts={counts} />}
+      {state.kind === 'ended' && (
+        <CommitResult outcome={state.outcome} fallback={counts} onReload={onReload} />
+      )}
     </div>
   );
 }
 
-function CommitResult({ outcome, counts }: { outcome: CommitOutcome; counts: ImportCounts }) {
+/** Numbers come from the latest commit response (outcome.job), never from an older page load. */
+function CommitResult({
+  outcome,
+  fallback,
+  onReload,
+}: {
+  outcome: CommitOutcome;
+  fallback: ImportCounts;
+  onReload: () => void;
+}) {
+  const counts = outcome.job?.counts ?? fallback;
   if (outcome.kind === 'uncertain') {
     return (
       <div role="alert" className="space-y-2 rounded-md border border-amber-600/50 p-3 text-sm">
@@ -253,15 +272,21 @@ function CommitResult({ outcome, counts }: { outcome: CommitOutcome; counts: Imp
       </div>
     );
   }
-  const done = allDone(counts);
+  if (outcome.kind === 'stalled') {
+    return (
+      <div role="status" className="space-y-2 rounded-md border p-3 text-sm">
+        <p className="font-medium">No rows were processed. Reload the import and try again.</p>
+        <p>This run: {tallyText(outcome.tally)}.</p>
+        <Button size="sm" variant="outline" onClick={onReload}>
+          Reload
+        </Button>
+      </div>
+    );
+  }
   return (
     <div role="status" className="space-y-1 rounded-md border p-3 text-sm">
       <p className="font-medium">
-        {outcome.kind === 'stalled'
-          ? 'The import stopped because no more rows could be processed.'
-          : done
-            ? 'All rows in this import are done.'
-            : 'The import run has finished.'}
+        {allDone(counts) ? 'All rows in this import are done.' : 'The import run has finished.'}
       </p>
       <p>This run: {tallyText(outcome.tally)}.</p>
       {(counts.needs_fixing > 0 || counts.rejected > 0) && (
@@ -269,9 +294,6 @@ function CommitResult({ outcome, counts }: { outcome: CommitOutcome; counts: Imp
           Still to do: {counts.needs_fixing} need fixing, {counts.rejected} not imported. Fix them below, then
           import again.
         </p>
-      )}
-      {outcome.kind === 'stalled' && (
-        <p>Fix or remove the rows marked “Same record as row …”, then choose Continue.</p>
       )}
     </div>
   );
@@ -286,10 +308,19 @@ export function ImportJobPage() {
   const query = useImportJob(jobId, filter);
   const remove = useSetRowRemoved(jobId ?? '');
   const close = useCloseImport(jobId ?? '');
+  const refreshAfterCommit = useRefreshAfterCommit();
+  const canSetup = useCan('setup.manage');
+  const canStaff = useCan('staff.manage');
+  const canStudents = useCan('students.manage');
   const [editing, setEditing] = useState<ImportRow | null>(null);
   const [removing, setRemoving] = useState<ImportRow | null>(null);
   const [closing, setClosing] = useState(false);
   const [actionError, setActionError] = useState<unknown>(null);
+  // The import run lives here, above the data states, so a failed background refresh can never
+  // unmount it (and lose "Some rows may already be imported — Continue").
+  const [run, setRun] = useState<CommitState>({ kind: 'idle' });
+  const [runJob, setRunJob] = useState<ImportJob | null>(null);
+  const busy = run.kind === 'running';
 
   const setFilter = (f: string) =>
     setParams(
@@ -326,132 +357,189 @@ export function ImportJobPage() {
     }
   };
 
+  const startRun = async (job: ImportJob) => {
+    const total = pendingCount(job.counts);
+    setActionError(null);
+    setRun({ kind: 'running', total, tally: { created: 0, skipped: 0, rejected: 0, needsFixing: 0 } });
+    const outcome = await runCommitLoop(
+      () => commitChunk(job.job_id),
+      (tally, r) => {
+        setRunJob(r.job);
+        setRun({ kind: 'running', total, tally });
+      },
+    );
+    if (outcome.job) setRunJob(outcome.job);
+    void refreshAfterCommit(job.job_id);
+    if (outcome.kind !== 'finished' && outcome.kind !== 'stalled' && outcome.error.code === 'CANCELLED')
+      return;
+    setRun({ kind: 'ended', outcome });
+  };
+
+  const data = query.data;
+  if (!data) {
+    // First load only: loading / error / forbidden / offline.
+    return <DataState query={query}>{() => null}</DataState>;
+  }
+
+  const first = data.pages[0]!;
+  const job = newest(first.job, runJob);
+  const columns = first.columns;
+  const rows = data.pages.flatMap((p) => p.rows);
+  const open = !isClosedJob(job.status);
+  const info = (DATASETS as Record<string, (typeof DATASETS)[ImportDataset] | undefined>)[job.dataset];
+  const canCommit =
+    info !== undefined &&
+    (
+      { 'setup.manage': canSetup, 'staff.manage': canStaff, 'students.manage': canStudents } as Record<
+        string,
+        boolean
+      >
+    )[info.commitCapability] === true;
+
   return (
     <div className="space-y-4">
-      <DataState query={query}>
-        {(data) => {
-          const first = data.pages[0]!;
-          const job = first.job;
-          const columns = first.columns;
-          const rows = data.pages.flatMap((p) => p.rows);
-          const open = !isClosedJob(job.status);
-          return (
-            <>
-              <PageHeader
-                title={`${datasetLabel(job.dataset)} import`}
-                description={
-                  <span className="space-y-0.5">
-                    <span className="block break-all">
-                      {job.file_name ?? 'Unnamed file'}
-                      {job.academic_year ? ` · ${job.academic_year}` : ''}
-                    </span>
-                    <span className="block text-xs">
-                      Started by {job.created_by ?? 'unknown user'} on {formatDateTime(job.created_at)}
-                    </span>
-                  </span>
-                }
-                actions={
-                  <>
-                    <JobStatusBadge status={job.status} />
-                    <Button variant="outline" size="sm" asChild>
-                      <Link to="/imports">All imports</Link>
-                    </Button>
-                  </>
-                }
-              />
-              <CountTiles counts={job.counts} />
+      <PageHeader
+        title={`${datasetLabel(job.dataset)} import`}
+        description={
+          <span className="space-y-0.5">
+            <span className="block break-all">
+              {job.file_name ?? 'Unnamed file'}
+              {job.academic_year ? ` · ${job.academic_year}` : ''}
+            </span>
+            <span className="block text-xs">
+              Started by {job.created_by ?? 'unknown user'} on {formatDateTime(job.created_at)}
+            </span>
+          </span>
+        }
+        actions={
+          <>
+            <JobStatusBadge status={job.status} />
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/imports">All imports</Link>
+            </Button>
+          </>
+        }
+      />
 
-              {open ? (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Import</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <ImportPanel key={job.job_id} job={job} />
-                    <div className="border-t pt-3">
-                      <Button variant="outline" size="sm" onClick={() => setClosing(true)}>
-                        Close import
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ) : (
-                <p role="status" className="bg-muted rounded-md p-3 text-sm">
-                  This import is closed and read-only. Rows that were not imported stay listed with their
-                  reasons. To import them, start a new import.
-                </p>
-              )}
-              <ErrorText error={actionError} />
+      {query.isError && !query.isFetching && (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center gap-2 rounded-md border border-amber-600/50 p-3 text-sm"
+        >
+          <p className="flex-1">
+            This import couldn&apos;t be refreshed. The rows and numbers below may be out of date.
+          </p>
+          <Button size="sm" variant="outline" onClick={() => void query.refetch()}>
+            Try again
+          </Button>
+        </div>
+      )}
 
-              <Tabs value={filter} onValueChange={setFilter}>
-                <TabsList aria-label="Show rows">
-                  {IMPORT_FILTERS.map((f) => {
-                    const n = filterCount(f, job.counts);
-                    return (
-                      <TabsTrigger key={f} value={f}>
-                        {FILTER_LABELS[f]}
-                        {n !== null ? ` (${n})` : ''}
-                      </TabsTrigger>
-                    );
-                  })}
-                </TabsList>
-              </Tabs>
+      <CountTiles counts={job.counts} />
 
-              {rows.length === 0 ? (
-                <p
-                  role="status"
-                  className="text-muted-foreground rounded-md border border-dashed p-6 text-center text-sm"
-                >
-                  No rows {filter === 'all' ? 'in this import' : `under “${FILTER_LABELS[filter]}”`}.
-                </p>
-              ) : (
-                <ul className="bg-background divide-y rounded-md border" aria-label="Rows">
-                  {rows.map((r) => (
-                    <RowItem
-                      key={r.row_no}
-                      row={r}
-                      job={job}
-                      columns={columns}
-                      open={open}
-                      onEdit={() => setEditing(r)}
-                      onRemove={() => setRemoving(r)}
-                      onRestore={() => void setRemoved(r, false)}
-                      restoring={remove.isPending && remove.variables?.rowNo === r.row_no}
-                    />
-                  ))}
-                </ul>
-              )}
-              <div className="text-muted-foreground flex items-center justify-between text-sm">
-                <span role="status">
-                  Showing {rows.length} row{rows.length === 1 ? '' : 's'}
-                  {query.hasNextPage ? ' — more available' : ''}
-                </span>
-                {query.hasNextPage && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => void query.fetchNextPage()}
-                    disabled={query.isFetchingNextPage}
-                  >
-                    {query.isFetchingNextPage ? 'Loading…' : 'Load more'}
-                  </Button>
-                )}
-              </div>
+      {open ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Import</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <ImportPanel
+              job={job}
+              state={run}
+              canCommit={canCommit}
+              onRun={() => void startRun(job)}
+              onReload={() => void query.refetch()}
+            />
+            <div className="border-t pt-3">
+              <Button variant="outline" size="sm" onClick={() => setClosing(true)} disabled={busy}>
+                Close import
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <p role="status" className="bg-muted rounded-md p-3 text-sm">
+          This import is closed and read-only. Rows that were not imported stay listed with their reasons. To
+          import them, start a new import.
+        </p>
+      )}
+      <ErrorText error={actionError} />
 
-              {editing && (
-                <RowEditDialog
-                  key={editing.row_no}
-                  jobId={job.job_id}
-                  row={editing}
-                  columns={columns}
-                  open
-                  onOpenChange={(o) => !o && setEditing(null)}
-                />
-              )}
-            </>
-          );
-        }}
-      </DataState>
+      <Tabs value={filter} onValueChange={setFilter}>
+        <TabsList aria-label="Show rows">
+          {IMPORT_FILTERS.map((f) => {
+            const n = filterCount(f, job.counts);
+            return (
+              <TabsTrigger key={f} value={f} disabled={busy}>
+                {FILTER_LABELS[f]}
+                {n !== null ? ` (${n})` : ''}
+              </TabsTrigger>
+            );
+          })}
+        </TabsList>
+      </Tabs>
+
+      {query.isPlaceholderData && (
+        <p role="status" className="text-muted-foreground text-sm">
+          Loading “{FILTER_LABELS[filter]}”…
+        </p>
+      )}
+      {rows.length === 0 ? (
+        <p
+          role="status"
+          className="text-muted-foreground rounded-md border border-dashed p-6 text-center text-sm"
+        >
+          No rows {filter === 'all' ? 'in this import' : `under “${FILTER_LABELS[filter]}”`}.
+        </p>
+      ) : (
+        <ul
+          className={`bg-background divide-y rounded-md border${query.isPlaceholderData ? 'opacity-60' : ''}`}
+          aria-label="Rows"
+          aria-busy={query.isPlaceholderData}
+        >
+          {rows.map((r) => (
+            <RowItem
+              key={r.row_no}
+              row={r}
+              job={job}
+              columns={columns}
+              open={open}
+              disabled={busy || query.isPlaceholderData}
+              onEdit={() => setEditing(r)}
+              onRemove={() => setRemoving(r)}
+              onRestore={() => void setRemoved(r, false)}
+              restoring={remove.isPending && remove.variables?.rowNo === r.row_no}
+            />
+          ))}
+        </ul>
+      )}
+      <div className="text-muted-foreground flex items-center justify-between text-sm">
+        <span role="status">
+          Showing {rows.length} row{rows.length === 1 ? '' : 's'}
+          {query.hasNextPage ? ' — more available' : ''}
+        </span>
+        {query.hasNextPage && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void query.fetchNextPage()}
+            disabled={query.isFetchingNextPage || busy}
+          >
+            {query.isFetchingNextPage ? 'Loading…' : 'Load more'}
+          </Button>
+        )}
+      </div>
+
+      {editing && (
+        <RowEditDialog
+          key={editing.row_no}
+          jobId={job.job_id}
+          row={editing}
+          columns={columns}
+          open
+          onOpenChange={(o) => !o && setEditing(null)}
+        />
+      )}
 
       <ConfirmDialog
         open={removing !== null}

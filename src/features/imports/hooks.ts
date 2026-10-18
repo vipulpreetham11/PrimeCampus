@@ -1,4 +1,10 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import type { ImportDataset, ImportFilter } from '@/contracts/imports';
 import type { Json } from '@/generated/database.types';
 import {
@@ -58,6 +64,8 @@ export function useImportJob(jobId: string | undefined, filter: ImportFilter) {
         { signal },
       ),
     getNextPageParam: (last) => last.next_cursor ?? undefined,
+    // Switching filters keeps the last page on screen (the job panel stays mounted) until the new one loads.
+    placeholderData: keepPreviousData,
     staleTime: 0,
   });
 }
@@ -112,9 +120,17 @@ export function useRefreshAfterCommit() {
   return (jobId: string) =>
     Promise.all([
       refreshJob(jobId),
-      ...['setup', 'students', 'student', 'staff-list', 'staff', 'guardian', 'guardian-search'].map((f) =>
-        qc.invalidateQueries({ queryKey: key(f) }),
-      ),
+      ...[
+        'setup',
+        'students',
+        'student',
+        'staff-list',
+        'staff',
+        'staff-groups',
+        'staff-groups-finance',
+        'guardian',
+        'guardian-search',
+      ].map((f) => qc.invalidateQueries({ queryKey: key(f) })),
     ]);
 }
 

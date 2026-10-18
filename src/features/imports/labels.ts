@@ -78,12 +78,13 @@ export function filterCount(f: ImportFilter, c: ImportCounts): number | null {
 }
 
 export type RowState =
-  'ready' | 'will_skip' | 'needs_fixing' | 'created' | 'skipped' | 'rejected' | 'removed';
+  'ready' | 'will_skip' | 'needs_fixing' | 'pending' | 'created' | 'skipped' | 'rejected' | 'removed';
 
 /** The row's state as the server's filters define it (errors include in-file duplicates). */
 export function rowState(r: ImportRow): RowState {
   if (r.status === 'removed') return 'removed';
   if (r.status === 'rejected') return 'rejected';
+  if (r.status === 'pending') return 'pending';
   if (r.status === 'committed') return r.action === 'skip' ? 'skipped' : 'created';
   if (r.errors.length > 0) return 'needs_fixing';
   return r.action === 'skip' ? 'will_skip' : 'ready';
@@ -93,6 +94,7 @@ export const ROW_STATE_LABELS: Record<RowState, string> = {
   ready: 'Ready',
   will_skip: 'Already exists — nothing will change',
   needs_fixing: 'Needs fixing',
+  pending: 'Being imported',
   created: 'Imported',
   skipped: 'Already existed — nothing changed',
   rejected: 'Not imported',

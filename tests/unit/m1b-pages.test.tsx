@@ -245,6 +245,54 @@ describe('new import wizard', () => {
     expect(screen.getByRole('link', { name: 'Review rows' })).toHaveAttribute('href', `/imports/${JOB_ID}`);
   });
 
+  it('rows with data only in unmapped columns are not sent, and the user is told before upload', async () => {
+    onRpc((fn) => {
+      if (fn === 'get_import_template') return { data: staffTemplateRow() };
+      if (fn === 'start_import') return { data: { ...jobRow(), same_file_before: [] } };
+      if (fn === 'stage_import_rows') {
+        return {
+          data: { job_id: JOB_ID, counts: countsRow({ total: 1, ready: 1 }), already_committed_rows: [] },
+        };
+      }
+      return { data: setupSnapshotRow() };
+    });
+    const user = await chooseStaffAndUpload(
+      'Employee no,Full name,Staff group,Joined on,Notes\nT1,Ravi,Teaching staff,2026-06-01,\n,,,,only a note\n',
+    );
+    expect(
+      await screen.findByText(/1 row had no data in the mapped columns and was skipped \(row 3\)/),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/^1 row will be checked/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Upload rows for checking' }));
+    expect(await screen.findByText(/All 1 rows are uploaded and checked/)).toBeInTheDocument();
+    expect(
+      (calls('stage_import_rows')[0]!.args!.p_rows as { row_no: number }[]).map((r) => r.row_no),
+    ).toEqual([2]);
+  });
+
+  it('a CSV with one unreadable byte shows which rows to check', async () => {
+    onRpc((fn) =>
+      fn === 'get_import_template' ? { data: staffTemplateRow() } : { data: setupSnapshotRow() },
+    );
+    const user = userEvent.setup();
+    renderRoutes('/imports/new');
+    await user.click(screen.getByRole('radio', { name: /^Staff/ }));
+    const enc = new TextEncoder();
+    const bytes = new Uint8Array([
+      ...enc.encode(
+        'Employee no,Full name,Staff group,Joined on\nT1,రవి,Teaching staff,2026-06-01\nT2,Meera ',
+      ),
+      0x96,
+      ...enc.encode(',Teaching staff,2026-06-01\n'),
+    ]);
+    await user.upload(
+      screen.getByLabelText('Spreadsheet file (.xlsx or .csv)'),
+      new File([bytes], 'staff.csv'),
+    );
+    expect(await screen.findByText(/could not be read and show as � in row 3\./)).toBeInTheDocument();
+    expect(screen.getByText('రవి', { exact: false })).toBeInTheDocument();
+  });
+
   it('a file that is not a spreadsheet is refused with a plain message', async () => {
     onRpc((fn) =>
       fn === 'get_import_template' ? { data: staffTemplateRow() } : { data: setupSnapshotRow() },
@@ -322,28 +370,23 @@ describe('import job page', () => {
     ]);
   });
 
-  it('import: a network error stops with "Continue"; continuing finishes and shows exact numbers', async () => {
+  it('outage: commit AND the background refresh fail → the Continue warning survives; numbers come from the latest commit', async () => {
     let commits = 0;
-    let after = false;
+    let outage = false;
     onRpc((fn) => {
-      if (fn === 'get_import_job') {
-        return {
-          data: after
-            ? page({
-                status: 'committing',
-                counts: countsRow({ total: 3, created: 1, skipped: 1, needs_fixing: 1 }),
-              })
-            : page(),
-        };
-      }
+      if (fn === 'get_import_job') return outage ? NETWORK_ERROR : { data: page() };
       if (fn === 'commit_import_chunk') {
         commits += 1;
-        if (commits === 1) return NETWORK_ERROR;
-        after = true;
+        if (commits === 1) {
+          outage = true; // the network is down: the refresh after the failed commit fails too
+          return NETWORK_ERROR;
+        }
+        // back for the commit only; get_import_job keeps failing, so the page counts stay stale
         return {
           data: {
             job: jobRow({
               status: 'committing',
+              updated_at: '2026-10-18T04:05:00+00:00',
               counts: countsRow({ total: 3, created: 1, skipped: 1, needs_fixing: 1 }),
             }),
             processed: [
@@ -359,21 +402,127 @@ describe('import job page', () => {
     const user = userEvent.setup();
     renderRoutes(`/imports/${JOB_ID}`);
     await user.click(await screen.findByRole('button', { name: 'Import 1 row' }));
+
+    // The failed refresh doesn't unmount the panel: both the warning and the stale-data note show.
+    expect(await screen.findByText(/This import couldn.t be refreshed/)).toBeInTheDocument();
     expect(
-      await screen.findByText('Some rows may already be imported — choose Continue to resume.'),
+      screen.getByText('Some rows may already be imported — choose Continue to resume.'),
     ).toBeInTheDocument();
+    expect(screen.getByTestId('tile-Ready')).toHaveTextContent('1');
+    await waitFor(() => expect(calls('get_import_job').length).toBeGreaterThan(1));
+    expect(
+      screen.getByText('Some rows may already be imported — choose Continue to resume.'),
+    ).toBeInTheDocument();
+
     await user.click(screen.getByRole('button', { name: 'Continue' }));
     expect(
       await screen.findByText(
         'This run: 1 imported, 1 already existed (nothing changed), 0 not imported, 0 need fixing.',
       ),
     ).toBeInTheDocument();
+    // From the commit response (the page's own copy still says Ready 1 / Imported 0)
     expect(screen.getByText(/Still to do: 1 need fixing, 0 not imported/)).toBeInTheDocument();
+    expect(screen.getByTestId('tile-Imported')).toHaveTextContent('1');
+    expect(screen.getByTestId('tile-Ready')).toHaveTextContent('0');
     expect(screen.queryByText(/All rows in this import are done/)).not.toBeInTheDocument();
     expect(calls('commit_import_chunk').map((c) => c.args)).toEqual([
       { p_job_id: JOB_ID, p_limit: 100, p_ctx_rev: 1 },
       { p_job_id: JOB_ID, p_limit: 100, p_ctx_rev: 1 },
     ]);
+  });
+
+  it('while a run is in progress: filter tabs, Edit, Remove and Close import are disabled', async () => {
+    let release: () => void = () => undefined;
+    onRpc((fn) => {
+      if (fn === 'get_import_job') return { data: page() };
+      if (fn === 'commit_import_chunk') {
+        return new Promise((resolve) => {
+          release = () =>
+            resolve({
+              data: {
+                job: jobRow({
+                  status: 'committing',
+                  counts: countsRow({ total: 3, created: 1, needs_fixing: 1, skipped: 1 }),
+                }),
+                processed: [{ row_no: 2, outcome: 'created', entity_id: STAFF_1 }],
+                more_ready: false,
+              },
+            });
+        });
+      }
+      return { data: null };
+    });
+    const user = userEvent.setup();
+    renderRoutes(`/imports/${JOB_ID}`);
+    await user.click(await screen.findByRole('button', { name: 'Import 1 row' }));
+    expect(await screen.findByRole('progressbar', { name: 'Importing rows…' })).toBeInTheDocument();
+    for (const tab of screen.getAllByRole('tab')) expect(tab).toBeDisabled();
+    const row3 = screen.getByTestId('import-row-3');
+    expect(within(row3).getByRole('button', { name: 'Edit' })).toBeDisabled();
+    expect(within(row3).getByRole('button', { name: 'Remove' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Close import' })).toBeDisabled();
+    release();
+    expect(await screen.findByText(/^This run: 1 imported/)).toBeInTheDocument();
+    expect(screen.getAllByRole('tab')[0]).toBeEnabled();
+  });
+
+  it('only existing rows left (nothing to fix): "Confirm" with the re-check wording', async () => {
+    onRpc((fn) =>
+      fn === 'get_import_job'
+        ? { data: page({ counts: countsRow({ total: 2, will_skip: 2 }) }, [rowRow({ action: 'skip' })]) }
+        : { data: null },
+    );
+    renderRoutes(`/imports/${JOB_ID}`);
+    expect(await screen.findByRole('button', { name: 'Confirm 2 existing rows' })).toBeEnabled();
+    expect(
+      screen.getByText(
+        'These rows already exist. Confirming re-checks them; anything missing now will be created.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('a chunk that processes nothing shows the neutral reload message', async () => {
+    onRpc((fn) => {
+      if (fn === 'get_import_job') return { data: page() };
+      if (fn === 'commit_import_chunk') {
+        return {
+          data: {
+            job: jobRow({ counts: countsRow({ total: 3, ready: 1, will_skip: 1, needs_fixing: 1 }) }),
+            processed: [],
+            more_ready: true,
+          },
+        };
+      }
+      return { data: null };
+    });
+    const user = userEvent.setup();
+    renderRoutes(`/imports/${JOB_ID}`);
+    await user.click(await screen.findByRole('button', { name: 'Import 1 row' }));
+    expect(
+      await screen.findByText('No rows were processed. Reload the import and try again.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reload' })).toBeInTheDocument();
+  });
+
+  it('a role without the dataset capability (staff.manage) cannot start the import, and is told why', async () => {
+    setContext(
+      ADMIN.filter((c) => c !== 'staff.manage'),
+      'admin',
+    );
+    onRpc((fn) => (fn === 'get_import_job' ? { data: page() } : { data: null }));
+    renderRoutes(`/imports/${JOB_ID}`);
+    expect(await screen.findByRole('button', { name: 'Import 1 row' })).toBeDisabled();
+    expect(screen.getByText(/Your role can't import staff\./)).toBeInTheDocument();
+  });
+
+  it('pending rows (allowed by the table) parse and show as "Being imported"', async () => {
+    onRpc((fn) =>
+      fn === 'get_import_job' ? { data: page({}, [rowRow({ status: 'pending' })]) } : { data: null },
+    );
+    renderRoutes(`/imports/${JOB_ID}`);
+    const row = await screen.findByTestId('import-row-2');
+    expect(row).toHaveTextContent('Being imported');
+    expect(within(row).queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
   });
 
   it('Import is disabled when nothing is ready or existing', async () => {
