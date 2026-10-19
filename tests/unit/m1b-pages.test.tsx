@@ -502,6 +502,14 @@ describe('import job page', () => {
       await screen.findByText('No rows were processed. Reload the import and try again.'),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reload' })).toBeInTheDocument();
+    // M2X: Reload goes back to the job's real state — the notice goes, Import is offered again
+    await user.click(screen.getByRole('button', { name: 'Reload' }));
+    await waitFor(() =>
+      expect(
+        screen.queryByText('No rows were processed. Reload the import and try again.'),
+      ).not.toBeInTheDocument(),
+    );
+    expect(await screen.findByRole('button', { name: 'Import 1 row' })).toBeEnabled();
   });
 
   it('a role without the dataset capability (staff.manage) cannot start the import, and is told why', async () => {

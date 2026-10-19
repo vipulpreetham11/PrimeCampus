@@ -51,7 +51,9 @@ export async function startImport(page: Page, dataset: keyof typeof DATASET_RADI
   await chooseFile(page, dataset, file);
   await expect(page.getByText('All required columns are matched.')).toBeVisible({ timeout: 60_000 });
   await page.getByRole('button', { name: 'Upload rows for checking' }).click();
-  await expect(page.getByText(/rows are uploaded and checked/)).toBeVisible({ timeout: 120_000 });
+  await expect(page.getByText(/^All [\d,]+ rows are uploaded and checked\./)).toBeVisible({
+    timeout: 120_000,
+  });
   await page.getByRole('link', { name: 'Review rows' }).click();
   await expect(page).toHaveURL(/\/imports\/[0-9a-f-]{36}$/);
   await expect(page.getByTestId('tile-Ready')).toBeVisible({ timeout: 30_000 });

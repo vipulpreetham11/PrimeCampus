@@ -448,7 +448,12 @@ export function ImportJobPage() {
               state={run}
               canCommit={canCommit}
               onRun={() => void startRun(job)}
-              onReload={() => void query.refetch()}
+              onReload={() => {
+                // back to the job's real state: the "no rows processed" notice goes, the Import
+                // button returns if rows are still ready (M2X: Reload used to leave the notice up)
+                setRun({ kind: 'idle' });
+                void query.refetch();
+              }}
             />
             <div className="border-t pt-3">
               <Button variant="outline" size="sm" onClick={() => setClosing(true)} disabled={busy}>
