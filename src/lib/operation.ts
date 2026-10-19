@@ -62,8 +62,23 @@ export class OperationTracker {
     this.renew();
   }
 
-  failed(error: unknown): void {
+  /**
+   * `keep` lists codes that are NOT a refusal for this particular call, e.g. post_collection's CONFLICT
+   * ("this payment is already being saved" = the same id is still in flight): the id must survive.
+   */
+  failed(error: unknown, options: { keep?: readonly string[] } = {}): void {
+    if (isAppError(error) && options.keep?.includes(error.code)) return;
     if (isDefiniteRefusal(error)) this.renew();
+  }
+
+  /** The id a retry of the last payload will use (for display/tests; does not change anything). */
+  get currentId(): string {
+    return this.id;
+  }
+
+  /** The user abandons an unconfirmed action (after checking it did not happen): start fresh. */
+  discard(): void {
+    this.renew();
   }
 
   private renew(): void {
