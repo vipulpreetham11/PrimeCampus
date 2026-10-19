@@ -104,6 +104,8 @@ function CollectForm({ studentId, statement }: { studentId: string; statement: S
   const [bankName, setBankName] = useState('');
   const [chequeDate, setChequeDate] = useState<string>(today);
   const [manual, setManual] = useState<Allocations | null>(null);
+  // bumps whenever the oldest-first default is recomputed, so the row inputs show the new values
+  const [allocGen, setAllocGen] = useState(0);
   const [invalidRows, setInvalidRows] = useState<Set<string>>(new Set());
   const [touched, setTouched] = useState(false);
   const [exceptionOpen, setExceptionOpen] = useState(false);
@@ -144,6 +146,7 @@ function CollectForm({ studentId, statement }: { studentId: string; statement: S
     setMethod(m);
     setAccountId(NO_DESK);
     setManual(null);
+    setAllocGen((g) => g + 1);
     setInvalidRows(new Set());
     post.reset();
     cheque.reset();
@@ -285,6 +288,7 @@ function CollectForm({ studentId, statement }: { studentId: string; statement: S
                   onChange={(p) => {
                     setAmount(p);
                     setManual(null);
+                    setAllocGen((g) => g + 1);
                     setInvalidRows(new Set());
                   }}
                   invalid={touched && (amount === null || check.extra > 0)}
@@ -421,7 +425,7 @@ function CollectForm({ studentId, statement }: { studentId: string; statement: S
               invoices={invoices}
               alloc={alloc}
               manual={manual !== null}
-              amountKey={`${amount ?? 0}-${method}`}
+              allocGen={allocGen}
               rowErrors={check.rowErrors}
               serverRow={serverRow}
               onChange={(id, v, bad) => {
@@ -435,6 +439,7 @@ function CollectForm({ studentId, statement }: { studentId: string; statement: S
               }}
               onReset={() => {
                 setManual(null);
+                setAllocGen((g) => g + 1);
                 setInvalidRows(new Set());
               }}
             />
@@ -463,6 +468,7 @@ function CollectForm({ studentId, statement }: { studentId: string; statement: S
                       setAmount(totalCap(invoices));
                       setAmountKey((k) => k + 1);
                       setManual(null);
+                      setAllocGen((g) => g + 1);
                     }}
                   >
                     Collect only the dues ({formatPaise(totalCap(invoices))})
@@ -538,7 +544,7 @@ function AllocationTable({
   invoices,
   alloc,
   manual,
-  amountKey,
+  allocGen,
   rowErrors,
   serverRow,
   onChange,
@@ -547,7 +553,7 @@ function AllocationTable({
   invoices: ReturnType<typeof openInvoices>;
   alloc: Allocations;
   manual: boolean;
-  amountKey: string;
+  allocGen: number;
   rowErrors: Record<string, string>;
   serverRow: string | undefined;
   onChange: (invoiceId: string, paise: number, invalid: boolean) => void;
@@ -591,7 +597,7 @@ function AllocationTable({
                 Amount for {inv.invoice_no}
               </Label>
               <MoneyInput
-                key={manual ? inv.invoice_id : `${inv.invoice_id}-${amountKey}`}
+                key={`${inv.invoice_id}-${allocGen}`}
                 id={`alloc-${inv.invoice_id}`}
                 value={alloc[inv.invoice_id] ?? 0}
                 onChange={(p, err) => onChange(inv.invoice_id, p ?? 0, err !== null)}
