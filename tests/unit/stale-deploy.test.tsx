@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { RouteError } from '@/app/RouteError';
@@ -136,7 +136,8 @@ describe('stale deploy recovery', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     renderFailingLazyRoute();
     expect(await screen.findByText(/loading the latest version/)).toBeInTheDocument();
-    expect(page.replaced).toHaveLength(1);
+    // the navigation itself runs in an effect, just after that render
+    await waitFor(() => expect(page.replaced).toHaveLength(1));
   });
 
   it('…and if it fails again right after that reload, shows the update page with a Reload button instead', async () => {
