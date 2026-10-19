@@ -122,6 +122,8 @@ export const homeworkPageSchema = z.object({
 export type HomeworkPage = z.infer<typeof homeworkPageSchema>;
 
 export const homeworkRosterSchema = z.object({
+  /** 2310: this person may record checks now (active homework, teacher of it / academic.correct) */
+  can_check: z.boolean(),
   /** the homework_assignments row as JSON (minus school_id) */
   assignment: z.object({
     id,

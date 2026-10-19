@@ -254,7 +254,18 @@ export const teacherTodaySchema = z.object({
     z.object({ section_id: id, section: z.string(), daily_marked: count, eligible: count }),
   ),
   homework_to_check: z.array(
-    z.object({ assignment_id: id, section_id: id, due_on: isoDate, checked: count }),
+    z.object({
+      assignment_id: id,
+      section_id: id,
+      // 2310: names and the eligible count come with the item
+      section: z.string(),
+      subject_id: id,
+      subject: z.string(),
+      assigned_on: isoDate,
+      due_on: isoDate,
+      eligible: count,
+      checked: count,
+    }),
   ),
 });
 export type TeacherToday = z.infer<typeof teacherTodaySchema>;

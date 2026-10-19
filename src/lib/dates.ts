@@ -174,6 +174,11 @@ export function weekdayLong(isoDay: number): string {
 const DAY_MONTH = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', timeZone: 'UTC' });
 const MONTH_YEAR = new Intl.DateTimeFormat('en-IN', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 
+/** '2026-10-21' -> '21 Oct'. */
+export function formatDayMonth(iso: IsoDate): string {
+  return DAY_MONTH.format(asUtcNoon(iso));
+}
+
 /** '2026-10-19' -> 'Mon 19 Oct'. */
 export function formatDayShort(iso: IsoDate): string {
   return `${weekdayShort(isoWeekday(iso))} ${DAY_MONTH.format(asUtcNoon(iso))}`;

@@ -188,9 +188,7 @@ function HomeworkItem({ h, onEdit }: { h: HomeworkListItem; onEdit: () => void }
             variant={h.can_check ? 'default' : 'outline'}
             className="min-h-11 sm:min-h-8"
           >
-            <Link to={`/homework/${h.assignment_id}`} state={{ canCheck: h.can_check }}>
-              {h.can_check ? 'Check' : 'See checks'}
-            </Link>
+            <Link to={`/homework/${h.assignment_id}`}>{h.can_check ? 'Check' : 'See checks'}</Link>
           </Button>
         )}
         {h.can_edit && h.status === 'active' && (
