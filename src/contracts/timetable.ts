@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 import { ATTENDANCE_MODES, SLOT_KINDS } from './setup';
 
 // DTOs for timetable and lesson RPCs (migrations 1000, 1300, 2200). Shapes follow the SQL exactly.

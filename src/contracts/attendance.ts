@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 import { ATTENDANCE_MODES } from './setup';
 import { resolvedDaySchema } from './timetable';
 

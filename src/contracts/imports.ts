@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 
 // DTOs for the spreadsheet-import RPCs (migrations 2000 + 2100). Shapes follow the SQL exactly:
 // private.imp_job_json, private.imp_row_json, get_import_template, start_import, stage_import_rows,

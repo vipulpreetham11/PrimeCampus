@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 import { ROLES } from './roles';
 
 // DTOs for the session/context RPCs (migration 0900) and the Operator school list (1600).

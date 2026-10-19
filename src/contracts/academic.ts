@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 
 // DTOs for diary and homework RPCs (migrations 1000, 2200). Shapes follow the SQL exactly.
 

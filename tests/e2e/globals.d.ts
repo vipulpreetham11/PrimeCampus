@@ -7,6 +7,7 @@ declare global {
       forceStaleRevision: () => void;
       probeSchoolRpc: () => Promise<string>;
       cachedQueryKeys: () => unknown[][];
+      cachedQueries: () => { key: unknown[]; hasData: boolean; status: string }[];
     };
   }
 }

@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 
 // DTOs for staff RPCs (1300, 1800, 1900). Confidential finance lives in its own schema and
 // its own query key — never merged into the general staff profile.
