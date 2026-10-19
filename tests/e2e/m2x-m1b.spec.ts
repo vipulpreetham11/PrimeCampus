@@ -378,6 +378,47 @@ test('M1b-5. 10,000 rows / ~5 MB: parsed, staged and checked (timings + memory r
   await context.close();
 });
 
+test('M1b-7. Without Web Workers (missing, or failing) the file is parsed on the main thread', async ({
+  browser,
+}) => {
+  test.setTimeout(240_000);
+  const book = await xlsx(`m2x-noworker-${RUN}.xlsx`, [
+    {
+      name: 'Staff',
+      rows: [
+        ['Employee no', 'Full name', 'Staff group', 'Joined on'],
+        [`M2XN${RUN}-1`, `M2x${RUN} Main Thread`, 'Office staff', '2026-06-01'],
+      ],
+    },
+  ]);
+  for (const variant of ['missing', 'failing'] as const) {
+    const { context, page } = await asAdmin(browser);
+    await page.addInitScript((v) => {
+      if (v === 'missing') {
+        // a locked-down browser: no Worker at all
+        Object.defineProperty(window, 'Worker', { value: undefined, configurable: true });
+      } else {
+        // a Worker that can't start (e.g. blocked by policy)
+        Object.defineProperty(window, 'Worker', {
+          value: function BlockedWorker() {
+            throw new Error('blocked');
+          },
+          configurable: true,
+        });
+      }
+    }, variant);
+    await page.reload();
+    await expect(page.getByTestId('dashboard-admin')).toBeVisible({ timeout: 30_000 });
+    expect(await page.evaluate(() => typeof Worker === 'undefined' || Worker.name === 'BlockedWorker')).toBe(
+      true,
+    );
+    await upload(page, 'staff', book);
+    await expect(page.getByRole('combobox', { name: 'Import "Full name" as' })).toBeVisible();
+    await expect(page.getByText(/^1 row will be checked/)).toBeVisible();
+    await context.close();
+  }
+});
+
 test('M1b-6. Network audit of these tests', () => {
   expect(seen.length).toBeGreaterThan(20);
   auditNetwork(seen);

@@ -7,6 +7,7 @@ import { MoneyInput } from '@/components/shared/MoneyInput';
 import { MoneyText } from '@/components/shared/MoneyText';
 import { OneTimeSecretDialog } from '@/components/shared/OneTimeSecretDialog';
 import { AppError } from '@/lib/errors';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 
 const base = { data: undefined, error: null, fetchStatus: 'idle' as const };
 
@@ -129,5 +130,40 @@ describe('OneTimeSecretDialog', () => {
     await userEvent.click(screen.getByRole('button', { name: /I have noted it/ }));
     expect(screen.queryByText('Temp-Pass-123')).toBeNull();
     expect(document.body.innerHTML).not.toContain('Temp-Pass-123');
+  });
+});
+
+describe('Dialog focus (M2X keyboard walkthrough)', () => {
+  function Opener() {
+    const [open, setOpen] = useState(false);
+    return (
+      <>
+        <button type="button" onClick={() => setOpen(true)}>
+          New class
+        </button>
+        {open && (
+          <Dialog open onOpenChange={setOpen}>
+            <DialogContent>
+              <DialogTitle>New class</DialogTitle>
+              <DialogDescription>Opened from state, no DialogTrigger.</DialogDescription>
+              <input aria-label="Class name" />
+            </DialogContent>
+          </Dialog>
+        )}
+      </>
+    );
+  }
+
+  it('a dialog opened without a trigger gives the focus back to its opener on Escape', async () => {
+    const user = userEvent.setup();
+    render(<Opener />);
+    const button = screen.getByRole('button', { name: 'New class' });
+    button.focus();
+    await user.keyboard('{Enter}');
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(document.activeElement?.closest('[role="dialog"]')).not.toBeNull();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(document.activeElement).toBe(button);
   });
 });
