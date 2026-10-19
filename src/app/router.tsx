@@ -4,6 +4,7 @@ import { RootLayout } from './layouts/RootLayout';
 import { AppShell } from './layouts/AppShell';
 import { RequireCapability } from './RequireCapability';
 import { RouteError } from './RouteError';
+import { consumeReloadMarker } from '@/lib/stale-deploy';
 
 // Data router with lazy route modules (TRD §3). Route guards improve navigation only;
 // the server enforces permissions on every RPC.
@@ -288,6 +289,9 @@ const childRoutes: RouteObject = guarded(
     },
   ],
 );
+
+// before the router reads the URL: drop the stale-deploy reload marker (lib/stale-deploy.ts)
+consumeReloadMarker();
 
 export const router = createBrowserRouter([
   {

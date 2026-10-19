@@ -2,8 +2,10 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from '@/app/App';
 import { initSession } from '@/lib/session/session';
+import { installStaleDeployRecovery } from '@/lib/stale-deploy';
 import '@/index.css';
 
+installStaleDeployRecovery();
 void initSession();
 
 if (import.meta.env.VITE_E2E_HOOKS === '1') {
