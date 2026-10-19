@@ -131,7 +131,7 @@ async function invoiceBalance(page: Page, studentId: string, invoiceNo: string) 
   await page.goto(`/fees/students/${studentId}`);
   const card = page.getByTestId(`invoice-${invoiceNo}`);
   await expect(card).toBeVisible({ timeout: 30_000 });
-  return card.getByTestId('invoice-balance');
+  return card.getByTestId('invoice-balance').locator('dd');
 }
 
 // ------------------------------------------------------------------ 0. logins
@@ -479,7 +479,7 @@ test('7. Late-fee rule; Apply late fees twice → one charge; waive with a reaso
   await modal(page).getByLabel('Reason').fill(`First delay forgiven ${RUN}`);
   await modal(page).getByRole('button', { name: 'Waive late fee' }).click();
   await expect(page.getByText('Late fee waived.')).toBeVisible({ timeout: 30_000 });
-  await expect(card.getByTestId('invoice-balance')).toHaveText('₹2,600.00');
+  await expect(card.getByTestId('invoice-balance').locator('dd')).toHaveText('₹2,600.00');
   await card.getByRole('button', { name: 'Details' }).click();
   await expect(card).toContainText('Late fee waived');
   inv = await runInvoice(ids.aarav);
@@ -541,10 +541,10 @@ test('9. Admin imports 3 opening balances (one bad row fixed in the wizard); sta
     `DEMO-S2,${H.tuition.code},2000,Balance 2025-26 ${RUN},,OB${RUN}-2`,
     `DEMO-S3,NOPE${RUN},750,Balance 2025-26 ${RUN},,OB${RUN}-3`,
   ]);
-  const stage = async () => {
+  const stage = async (upload: typeof file) => {
     await page.goto('/imports/new?dataset=opening_balances');
     await expect(page.getByRole('radio', { name: /^Opening balances/ })).toBeChecked();
-    await page.getByLabel('Spreadsheet file (.xlsx or .csv)').setInputFiles(file);
+    await page.getByLabel('Spreadsheet file (.xlsx or .csv)').setInputFiles(upload);
     await expect(page.getByText('All required columns are matched.')).toBeVisible({ timeout: 60_000 });
     await page.getByRole('button', { name: 'Upload rows for checking' }).click();
     await expect(page.getByText(/^All [\d,]+ rows are uploaded and checked\./)).toBeVisible({
@@ -553,10 +553,11 @@ test('9. Admin imports 3 opening balances (one bad row fixed in the wizard); sta
     await page.getByRole('link', { name: 'Review rows' }).click();
     await expect(page.getByTestId('tile-Ready')).toBeVisible({ timeout: 30_000 });
   };
-  await stage();
+  await stage(file);
   await expectTiles(page, { Ready: 2, 'Needs fixing': 1 });
   await expect(page.getByTestId('ready-amount')).toHaveText('₹3,500.50');
-  await importRow(page, 3).getByRole('button', { name: 'Edit' }).click();
+  // rows are numbered like the spreadsheet (header = row 1): the bad third data row is row 4
+  await importRow(page, 4).getByRole('button', { name: 'Edit' }).click();
   await modal(page).getByLabel('Fee head code (required)').fill(H.tuition.code);
   await modal(page).getByRole('button', { name: 'Save and check' }).click();
   await expectTiles(page, { Ready: 3, 'Needs fixing': 0 });
@@ -569,10 +570,17 @@ test('9. Admin imports 3 opening balances (one bad row fixed in the wizard); sta
   await page.goto(`/fees/students/${ids.aarav}`);
   await expect(page.getByText(`Balance 2025-26 ${RUN}`)).toBeVisible({ timeout: 30_000 });
 
-  // the same file again → every row already exists, nothing is created
-  await stage();
+  // the corrected file again (as staff would re-run it) → every row already exists, nothing is created
+  const fixed = csv(`opening-fixed-${RUN}.csv`, [
+    'Admission no,Fee head code,Amount due (₹),What it is for,Due date,Old reference',
+    `DEMO-S1,${H.tuition.code},"1,500.50",Balance 2025-26 ${RUN},,OB${RUN}-1`,
+    `DEMO-S2,${H.tuition.code},2000,Balance 2025-26 ${RUN},,OB${RUN}-2`,
+    `DEMO-S3,${H.tuition.code},750,Balance 2025-26 ${RUN},,OB${RUN}-3`,
+  ]);
+  await stage(fixed);
   await expectTiles(page, { Ready: 0, 'Already exist': 3 });
   await expect(page.getByTestId('ready-amount')).toHaveText('₹0.00');
+  expect(await runImport(page)).toContain('0 imported, 3 already existed');
   await admin.context.close();
 });
 
@@ -668,7 +676,7 @@ test('11. 375px screenshots (collect, statement, receipt print preview, dues) an
   await page.emulateMedia({ media: 'screen' });
 
   await page.goto('/fees/dues');
-  await expect(page.getByTestId('dues-totals')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('dues-m-totals')).toBeVisible({ timeout: 30_000 });
   await noHorizontalScroll(page);
   await shot(page, `${SHOTS}/375-dues.png`);
   await context.close();

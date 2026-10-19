@@ -157,7 +157,8 @@ function DuesTable({ rows }: { rows: DuesRow[] }) {
   return (
     <Card>
       <CardContent className="pt-6">
-        <div className="overflow-x-auto rounded-md border">
+        <DuesList rows={rows} />
+        <div className="hidden overflow-x-auto rounded-md border sm:block">
           <table className="w-full min-w-[42rem] text-sm" data-testid="dues-table">
             <thead className="bg-muted/50 text-left">
               <tr>
@@ -223,5 +224,61 @@ function DuesTable({ rows }: { rows: DuesRow[] }) {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+/** Phones: one stacked row per student so the balance is always on screen (the table needs ~42rem). */
+function DuesList({ rows }: { rows: DuesRow[] }) {
+  const t = duesTotals(rows);
+  return (
+    <div className="sm:hidden" data-testid="dues-list">
+      <ul className="divide-y rounded-md border text-sm">
+        {rows.map((r) => (
+          <li key={r.student_id} className="space-y-1 p-3" data-testid={`dues-m-${r.admission_no}`}>
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <Link to={`/fees/students/${r.student_id}`} className="font-medium underline">
+                  {r.name}
+                </Link>
+                <span className="text-muted-foreground block text-xs break-all">
+                  {r.admission_no} · {r.class_section ?? 'Class not set'}
+                </span>
+              </div>
+              <div className="shrink-0 text-right">
+                <span className="text-muted-foreground block text-xs">Balance</span>
+                <MoneyText paise={r.balance_paise} className="font-semibold" />
+              </div>
+            </div>
+            <p className="text-muted-foreground text-xs">
+              Charged <MoneyText paise={r.charged_paise} missing="no issued invoices" /> · paid{' '}
+              <MoneyText paise={r.paid_paise} /> · overdue <MoneyText paise={r.overdue_paise} />
+              {r.pending_cheque_paise > 0 && (
+                <>
+                  {' '}
+                  · pending cheques <MoneyText paise={r.pending_cheque_paise} />
+                </>
+              )}
+            </p>
+          </li>
+        ))}
+      </ul>
+      <dl
+        className="bg-muted/50 mt-2 grid grid-cols-2 gap-2 rounded-md p-3 text-sm"
+        data-testid="dues-m-totals"
+      >
+        <div>
+          <dt className="text-muted-foreground text-xs">Total balance ({t.students} students)</dt>
+          <dd className="font-semibold">
+            <MoneyText paise={t.balance} />
+          </dd>
+        </div>
+        <div>
+          <dt className="text-muted-foreground text-xs">Overdue</dt>
+          <dd className="font-semibold">
+            <MoneyText paise={t.overdue} />
+          </dd>
+        </div>
+      </dl>
+    </div>
   );
 }

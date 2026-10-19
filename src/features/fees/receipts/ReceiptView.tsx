@@ -17,7 +17,9 @@ export type PaperSize = 'A5' | 'A4';
 export function printCss(size: PaperSize): string {
   return `@media print {
   @page { size: ${size} portrait; margin: ${size === 'A5' ? '8mm' : '12mm'}; }
-  body * { visibility: hidden !important; }
+  /* no transitions: a fading button would still show while print styles take over */
+  body * { visibility: hidden !important; transition: none !important; animation: none !important; }
+  [data-sonner-toaster] { display: none !important; }
   #fee-receipt, #fee-receipt * { visibility: visible !important; }
   #fee-receipt { position: absolute; left: 0; top: 0; width: 100%; border: none !important; box-shadow: none !important; padding: 0 !important; color: #000; }
   .receipt-no-print { display: none !important; }
