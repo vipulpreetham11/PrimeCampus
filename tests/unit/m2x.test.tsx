@@ -11,6 +11,10 @@ import { renderPage, setContext } from './render';
 vi.mock('@/lib/supabase', () => ({ supabase: fakeSupabase }));
 
 const { ClassesPage } = await import('@/features/setup/ClassesPage');
+const { StaffGroupsPage } = await import('@/features/staff/StaffGroupsPage');
+
+const GROUP = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+const GROUP2 = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
 
 const calls = (fn: string) => rpcCalls.filter((c) => c.fn === fn);
 
@@ -99,5 +103,83 @@ describe('server field errors (migration 2310 details.field)', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('A value has the wrong format');
     expect(within(dialog).getByLabelText('Class name')).not.toHaveAttribute('aria-invalid', 'true');
+  });
+});
+
+// ------------------------------------------------------------------ §1 staff group default salary
+describe('staff group: clear default salary (save_staff_group p_clear_default_salary)', () => {
+  const group = (id: string, name: string, salary: number | null, version = 4) => ({
+    id,
+    name,
+    status: 'active',
+    version,
+    staff_count: 2,
+    default_monthly_salary_paise: salary,
+  });
+
+  it('"No default salary" and ₹0 are shown differently', async () => {
+    setContext(['setup.manage', 'staff_finance.read', 'staff_finance.manage']);
+    onRpc((fn) => ({
+      data:
+        fn === 'list_staff_groups'
+          ? [group(GROUP, 'Teaching staff', null), group(GROUP2, 'Volunteers', 0)]
+          : null,
+    }));
+    renderPage(<StaffGroupsPage />);
+    const none = within(await screen.findByTestId('group-row-Teaching staff')).getByTestId('group-salary');
+    const zero = within(screen.getByTestId('group-row-Volunteers')).getByTestId('group-salary');
+    expect(none).toHaveTextContent('No default salary');
+    expect(none).not.toHaveTextContent('₹');
+    expect(zero).toHaveTextContent('₹0.00');
+  });
+
+  it('Clear default salary sends p_clear_default_salary with the version and no amount; Undo cancels it', async () => {
+    setContext(['setup.manage', 'staff_finance.read', 'staff_finance.manage']);
+    onRpc((fn) => {
+      if (fn === 'list_staff_groups') return { data: [group(GROUP, 'Teaching staff', 3000000)] };
+      if (fn === 'save_staff_group')
+        return { data: { staff_group_id: GROUP, version: 5, default_salary_paise: null } };
+      return { data: null };
+    });
+    renderPage(<StaffGroupsPage />);
+    await userEvent.click(
+      within(await screen.findByTestId('group-row-Teaching staff')).getByRole('button', { name: 'Edit' }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Clear default salary' }));
+    expect(within(dialog).getByRole('status')).toHaveTextContent('will be removed when you save');
+    expect(within(dialog).queryByLabelText('Default monthly salary')).not.toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Undo' }));
+    expect(within(dialog).getByLabelText('Default monthly salary')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Clear default salary' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(calls('save_staff_group')).toHaveLength(1));
+    const args = calls('save_staff_group')[0]!.args!;
+    expect(args).toMatchObject({ p_id: GROUP, p_expected_version: 4, p_clear_default_salary: true });
+    expect(args).not.toHaveProperty('p_default_salary_paise');
+  });
+
+  it('without staff_finance.manage there is no Clear action', async () => {
+    setContext(['setup.manage', 'staff_finance.read']);
+    onRpc((fn) => ({ data: fn === 'list_staff_groups' ? [group(GROUP, 'Teaching staff', 3000000)] : null }));
+    renderPage(<StaffGroupsPage />);
+    await userEvent.click(
+      within(await screen.findByTestId('group-row-Teaching staff')).getByRole('button', { name: 'Edit' }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByRole('button', { name: 'Clear default salary' })).not.toBeInTheDocument();
+  });
+
+  it('a group without a default says so in the dialog', async () => {
+    setContext(['setup.manage', 'staff_finance.read', 'staff_finance.manage']);
+    onRpc((fn) => ({ data: fn === 'list_staff_groups' ? [group(GROUP, 'Teaching staff', null)] : null }));
+    renderPage(<StaffGroupsPage />);
+    await userEvent.click(
+      within(await screen.findByTestId('group-row-Teaching staff')).getByRole('button', { name: 'Edit' }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/^No default salary\./)).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'Clear default salary' })).not.toBeInTheDocument();
   });
 });

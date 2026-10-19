@@ -207,7 +207,7 @@ describe('staff group default salary', () => {
     default_monthly_salary_paise: salary,
   });
 
-  it('an existing default cannot be emptied (the server cannot clear it)', async () => {
+  it('emptying the amount is not a removal (M2X: removal is the explicit "Clear default salary")', async () => {
     setContext(['setup.manage', 'staff_finance.read', 'staff_finance.manage']);
     onRpc((fn) => ({ data: fn === 'list_staff_groups' ? [group(3000000)] : null }));
     renderPage(<StaffGroupsPage />);
@@ -216,7 +216,9 @@ describe('staff group default salary', () => {
     );
     await userEvent.clear(screen.getByLabelText('Default monthly salary'));
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
-    expect(await screen.findByText('To change it, enter a new amount.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Enter an amount, or use “Clear default salary” to remove it.'),
+    ).toBeInTheDocument();
     expect(calls('save_staff_group')).toHaveLength(0);
   });
 
