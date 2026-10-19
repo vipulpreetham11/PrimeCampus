@@ -76,7 +76,13 @@ function ReasonField({
   return (
     <div className="space-y-1">
       <Label htmlFor={id}>{label}</Label>
-      <Textarea id={id} value={value} maxLength={500} onChange={(e) => onChange(e.target.value)} aria-invalid={!!error || undefined} />
+      <Textarea
+        id={id}
+        value={value}
+        maxLength={500}
+        onChange={(e) => onChange(e.target.value)}
+        aria-invalid={!!error || undefined}
+      />
       {error && <p className="text-destructive text-sm">{error}</p>}
     </div>
   );
@@ -136,7 +142,8 @@ export function AdjustmentDialog({ invoice, onClose }: { invoice: StatementInvoi
       title={`Adjust ${invoice.invoice_no}`}
       description={
         <>
-          Balance now <MoneyText paise={invoice.balance_paise} />. A discount lowers it; an extra charge raises it.
+          Balance now <MoneyText paise={invoice.balance_paise} />. A discount lowers it; an extra charge
+          raises it.
         </>
       }
       locked={locked}
@@ -167,14 +174,30 @@ export function AdjustmentDialog({ invoice, onClose }: { invoice: StatementInvoi
           <div className="space-y-1">
             <Label htmlFor={amountId}>Amount</Label>
             <MoneyInput id={amountId} value={amount} allowZero={false} onChange={(p) => setAmount(p)} />
-            {touched && (amount === null || amount <= 0) && <p className="text-destructive text-sm">Enter an amount greater than ₹0</p>}
-            {over && <p className="text-destructive text-sm">A discount can be at most the balance ({formatPaise(invoice.balance_paise)})</p>}
+            {touched && (amount === null || amount <= 0) && (
+              <p className="text-destructive text-sm">Enter an amount greater than ₹0</p>
+            )}
+            {over && (
+              <p className="text-destructive text-sm">
+                A discount can be at most the balance ({formatPaise(invoice.balance_paise)})
+              </p>
+            )}
           </div>
-          <ReasonField value={reason} onChange={setReason} error={touched && reason.trim() === '' ? 'A reason is required' : null} />
+          <ReasonField
+            value={reason}
+            onChange={setReason}
+            error={touched && reason.trim() === '' ? 'A reason is required' : null}
+          />
         </fieldset>
         {action.state.kind === 'failed' && <ErrorText error={action.state.error} />}
         {action.state.kind === 'unconfirmed' ? (
-          <UnconfirmedNotice what="adjustment" error={action.state.error} busy={false} onRetry={() => void action.retry().then(done)} onDiscard={action.discard} />
+          <UnconfirmedNotice
+            what="adjustment"
+            error={action.state.error}
+            busy={false}
+            onRetry={() => void action.retry().then(done)}
+            onDiscard={action.discard}
+          />
         ) : (
           <Footer onCancel={onClose} busy={action.state.kind === 'saving'} label="Save adjustment" />
         )}
@@ -207,7 +230,13 @@ export function ReasonActionDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<AppError | null>(null);
   return (
-    <DialogShell open onOpenChange={(o) => !o && onClose()} title={title} description={description} locked={busy}>
+    <DialogShell
+      open
+      onOpenChange={(o) => !o && onClose()}
+      title={title}
+      description={description}
+      locked={busy}
+    >
       <form
         noValidate
         className="space-y-4"
@@ -227,7 +256,11 @@ export function ReasonActionDialog({
         }}
       >
         <fieldset disabled={busy}>
-          <ReasonField value={reason} onChange={setReason} error={touched && reason.trim() === '' ? 'A reason is required' : null} />
+          <ReasonField
+            value={reason}
+            onChange={setReason}
+            error={touched && reason.trim() === '' ? 'A reason is required' : null}
+          />
         </fieldset>
         <ErrorText error={error} />
         <Footer onCancel={onClose} busy={busy} label={confirmLabel} destructive={destructive} />
@@ -237,7 +270,13 @@ export function ReasonActionDialog({
 }
 
 /** cancel_invoice takes an operation id (logged by the server); a repeat of a cancelled invoice is a replay. */
-export function CancelInvoiceDialog({ invoice, onClose }: { invoice: StatementInvoice; onClose: () => void }) {
+export function CancelInvoiceDialog({
+  invoice,
+  onClose,
+}: {
+  invoice: StatementInvoice;
+  onClose: () => void;
+}) {
   const mut = useCancelInvoice();
   const [operationId] = useState(() => crypto.randomUUID());
   return (
@@ -248,13 +287,23 @@ export function CancelInvoiceDialog({ invoice, onClose }: { invoice: StatementIn
       destructive
       onSend={(reason) => mut.mutateAsync({ operationId, invoiceId: invoice.invoice_id, reason })}
       onClose={onClose}
-      successMessage={(r) => (r.replayed ? 'This invoice was already cancelled.' : `Invoice cancelled.${r.note ? ` ${r.note}.` : ''}`)}
+      successMessage={(r) =>
+        r.replayed
+          ? 'This invoice was already cancelled.'
+          : `Invoice cancelled.${r.note ? ` ${r.note}.` : ''}`
+      }
     />
   );
 }
 
 // ------------------------------------------------------------------ reverse a collection
-export function ReverseDialog({ collection, onClose }: { collection: StatementCollection; onClose: () => void }) {
+export function ReverseDialog({
+  collection,
+  onClose,
+}: {
+  collection: StatementCollection;
+  onClose: () => void;
+}) {
   const mut = useReverseCollection();
   const send = useCallback(
     (operationId: string, p: { collectionId: string; reason: string; amount: number | null }) =>
@@ -285,8 +334,8 @@ export function ReverseDialog({ collection, onClose }: { collection: StatementCo
       title={`Reverse ${collection.receipt_no}`}
       description={
         <>
-          Still reversible: <MoneyText paise={reversible} />. The receipt stays printable; the reversal is listed
-          under it and the dues reopen (newest invoice first).
+          Still reversible: <MoneyText paise={reversible} />. The receipt stays printable; the reversal is
+          listed under it and the dues reopen (newest invoice first).
         </>
       }
       locked={locked}
@@ -298,20 +347,34 @@ export function ReverseDialog({ collection, onClose }: { collection: StatementCo
           e.preventDefault();
           setTouched(true);
           if (reason.trim() === '' || tooMuch || (amount !== null && amount <= 0)) return;
-          void action.run({ collectionId: collection.collection_id, reason: reason.trim(), amount }).then(done);
+          void action
+            .run({ collectionId: collection.collection_id, reason: reason.trim(), amount })
+            .then(done);
         }}
       >
         <fieldset disabled={locked} className="space-y-4">
           <div className="space-y-1">
-            <Label htmlFor={amountId}>Amount to reverse (leave empty for all {formatPaise(reversible)})</Label>
+            <Label htmlFor={amountId}>
+              Amount to reverse (leave empty for all {formatPaise(reversible)})
+            </Label>
             <MoneyInput id={amountId} value={amount} allowZero={false} onChange={(p) => setAmount(p)} />
             {tooMuch && <p className="text-destructive text-sm">At most {formatPaise(reversible)}</p>}
           </div>
-          <ReasonField value={reason} onChange={setReason} error={touched && reason.trim() === '' ? 'A reason is required' : null} />
+          <ReasonField
+            value={reason}
+            onChange={setReason}
+            error={touched && reason.trim() === '' ? 'A reason is required' : null}
+          />
         </fieldset>
         {action.state.kind === 'failed' && <ErrorText error={action.state.error} />}
         {action.state.kind === 'unconfirmed' ? (
-          <UnconfirmedNotice what="reversal" error={action.state.error} busy={false} onRetry={() => void action.retry().then(done)} onDiscard={action.discard} />
+          <UnconfirmedNotice
+            what="reversal"
+            error={action.state.error}
+            busy={false}
+            onRetry={() => void action.retry().then(done)}
+            onDiscard={action.discard}
+          />
         ) : (
           <Footer onCancel={onClose} busy={action.state.kind === 'saving'} label="Reverse" destructive />
         )}
@@ -334,7 +397,10 @@ export function GrantConcessionDialog({
 }) {
   const setup = useFeeSetup(yearId);
   const mut = useGrantConcession();
-  const send = useCallback((operationId: string, v: GrantInput) => mut.mutateAsync(grantArgs(operationId, v)), [mut]);
+  const send = useCallback(
+    (operationId: string, v: GrantInput) => mut.mutateAsync(grantArgs(operationId, v)),
+    [mut],
+  );
   const action = useMoneyAction(send);
   const [presetId, setPresetId] = useState('');
   const [termId, setTermId] = useState('__year');
@@ -363,7 +429,11 @@ export function GrantConcessionDialog({
             {granted.issued_invoices_not_changed.map((i, n) => (
               <span key={i.invoice_id}>
                 {n > 0 && ', '}
-                <Link className="underline" to={`/fees/students/${studentId}#invoice-${i.invoice_id}`} onClick={onClose}>
+                <Link
+                  className="underline"
+                  to={`/fees/students/${studentId}#invoice-${i.invoice_id}`}
+                  onClick={onClose}
+                >
                   {i.invoice_no}
                 </Link>
                 {i.term ? ` (${i.term})` : ''}
@@ -395,7 +465,13 @@ export function GrantConcessionDialog({
           setTouched(true);
           if (!presetId || reason.trim() === '') return;
           void action
-            .run({ studentId, yearId, presetId, reason: reason.trim(), termId: termId === '__year' ? null : termId })
+            .run({
+              studentId,
+              yearId,
+              presetId,
+              reason: reason.trim(),
+              termId: termId === '__year' ? null : termId,
+            })
             .then(done);
         }}
       >
@@ -404,14 +480,18 @@ export function GrantConcessionDialog({
             <Label htmlFor={ids.preset}>Concession</Label>
             <Select value={presetId} onValueChange={setPresetId}>
               <SelectTrigger id={ids.preset} className="w-full" aria-label="Concession">
-                <SelectValue placeholder={presets.length ? 'Choose' : 'No active concessions — add one in Fee setup'} />
+                <SelectValue
+                  placeholder={presets.length ? 'Choose' : 'No active concessions — add one in Fee setup'}
+                />
               </SelectTrigger>
               <SelectContent>
                 {presets.map((p) => (
                   <SelectItem key={p.id} value={p.id}>
                     {p.name} —{' '}
-                    {p.kind === 'percent' ? formatBasisPoints(p.percent_bp ?? 0) : formatPaise(p.fixed_paise ?? 0)} of{' '}
-                    {p.fee_head_ids.map((h) => heads.get(h) ?? 'a fee').join(', ')}
+                    {p.kind === 'percent'
+                      ? formatBasisPoints(p.percent_bp ?? 0)
+                      : formatPaise(p.fixed_paise ?? 0)}{' '}
+                    of {p.fee_head_ids.map((h) => heads.get(h) ?? 'a fee').join(', ')}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -434,11 +514,21 @@ export function GrantConcessionDialog({
               </SelectContent>
             </Select>
           </div>
-          <ReasonField value={reason} onChange={setReason} error={touched && reason.trim() === '' ? 'A reason is required' : null} />
+          <ReasonField
+            value={reason}
+            onChange={setReason}
+            error={touched && reason.trim() === '' ? 'A reason is required' : null}
+          />
         </fieldset>
         {action.state.kind === 'failed' && <ErrorText error={action.state.error} />}
         {action.state.kind === 'unconfirmed' ? (
-          <UnconfirmedNotice what="concession" error={action.state.error} busy={false} onRetry={() => void action.retry().then(done)} onDiscard={action.discard} />
+          <UnconfirmedNotice
+            what="concession"
+            error={action.state.error}
+            busy={false}
+            onRetry={() => void action.retry().then(done)}
+            onDiscard={action.discard}
+          />
         ) : (
           <Footer onCancel={onClose} busy={action.state.kind === 'saving'} label="Grant" />
         )}
@@ -492,7 +582,8 @@ export function OpeningBalanceDialog({
         onSubmit={(e) => {
           e.preventDefault();
           setTouched(true);
-          if (!headId || amount === null || amount <= 0 || origin.trim() === '' || reference.trim() === '') return;
+          if (!headId || amount === null || amount <= 0 || origin.trim() === '' || reference.trim() === '')
+            return;
           setError(null);
           mut
             .mutateAsync({
@@ -505,7 +596,11 @@ export function OpeningBalanceDialog({
               dueDate: dueDate || null,
             })
             .then((r) => {
-              toast.success(r.replayed ? `Already recorded as ${r.invoice_no}.` : `Opening balance added: ${r.invoice_no}.`);
+              toast.success(
+                r.replayed
+                  ? `Already recorded as ${r.invoice_no}.`
+                  : `Opening balance added: ${r.invoice_no}.`,
+              );
               onClose();
             })
             .catch((err: unknown) => setError(toAppError(err)));
@@ -531,17 +626,35 @@ export function OpeningBalanceDialog({
           <div className="space-y-1">
             <Label htmlFor={ids.amount}>Amount due</Label>
             <MoneyInput id={ids.amount} value={amount} allowZero={false} onChange={(p) => setAmount(p)} />
-            {touched && (amount === null || amount <= 0) && <p className="text-destructive text-sm">Enter an amount greater than ₹0</p>}
+            {touched && (amount === null || amount <= 0) && (
+              <p className="text-destructive text-sm">Enter an amount greater than ₹0</p>
+            )}
           </div>
           <div className="space-y-1">
             <Label htmlFor={ids.origin}>What it is for</Label>
-            <Input id={ids.origin} value={origin} maxLength={120} placeholder="Balance from 2025-26" onChange={(e) => setOrigin(e.target.value)} />
-            {touched && origin.trim() === '' && <p className="text-destructive text-sm">Say what the balance is for</p>}
+            <Input
+              id={ids.origin}
+              value={origin}
+              maxLength={120}
+              placeholder="Balance from 2025-26"
+              onChange={(e) => setOrigin(e.target.value)}
+            />
+            {touched && origin.trim() === '' && (
+              <p className="text-destructive text-sm">Say what the balance is for</p>
+            )}
           </div>
           <div className="space-y-1">
             <Label htmlFor={ids.ref}>Old reference (ledger page / number)</Label>
-            <Input id={ids.ref} value={reference} maxLength={60} placeholder="LEDGER-2025-118" onChange={(e) => setReference(e.target.value)} />
-            {touched && reference.trim() === '' && <p className="text-destructive text-sm">A reference is required</p>}
+            <Input
+              id={ids.ref}
+              value={reference}
+              maxLength={60}
+              placeholder="LEDGER-2025-118"
+              onChange={(e) => setReference(e.target.value)}
+            />
+            {touched && reference.trim() === '' && (
+              <p className="text-destructive text-sm">A reference is required</p>
+            )}
           </div>
           <div className="space-y-1">
             <Label htmlFor={ids.due}>Due date (optional — defaults to the year start)</Label>

@@ -353,7 +353,9 @@ export const statementCollectionSchema = z.object({
   method: z.enum(PAYMENT_METHODS),
   amount_paise: paise,
   reference: z.string().nullable().optional(),
-  allocations: list(allocationSchema).optional().transform((v) => v ?? []),
+  allocations: list(allocationSchema)
+    .optional()
+    .transform((v) => v ?? []),
   reversed_paise: paise,
   reversals: list(reversalSchema),
 });
@@ -473,7 +475,10 @@ export const exceptionRowSchema = z.object({
   version: count,
 });
 export type ExceptionRow = z.infer<typeof exceptionRowSchema>;
-export const exceptionPageSchema = z.object({ items: z.array(exceptionRowSchema), next_cursor: id.nullable() });
+export const exceptionPageSchema = z.object({
+  items: z.array(exceptionRowSchema),
+  next_cursor: id.nullable(),
+});
 
 export const collectionRowSchema = z.object({
   collection_id: id,

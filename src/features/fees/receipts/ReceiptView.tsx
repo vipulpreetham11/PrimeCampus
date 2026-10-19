@@ -39,7 +39,8 @@ export function ReceiptView({ receipt }: { receipt: Receipt }) {
           <legend className="sr-only">Paper size</legend>
           {(['A5', 'A4'] as const).map((p) => (
             <label key={p} className="flex items-center gap-1">
-              <input type="radio" name="paper" value={p} checked={size === p} onChange={() => setSize(p)} /> {p}
+              <input type="radio" name="paper" value={p} checked={size === p} onChange={() => setSize(p)} />{' '}
+              {p}
             </label>
           ))}
         </fieldset>
@@ -135,7 +136,8 @@ export function ReceiptView({ receipt }: { receipt: Receipt }) {
             <ul className="space-y-0.5">
               {receipt.reversals.map((r, i) => (
                 <li key={i}>
-                  {formatDateTime(r.at)} · {reversalCauseLabel(r.cause)} · <MoneyText paise={r.amount_paise} />
+                  {formatDateTime(r.at)} · {reversalCauseLabel(r.cause)} ·{' '}
+                  <MoneyText paise={r.amount_paise} />
                   {r.reason ? ` — ${r.reason}` : ''}
                 </li>
               ))}

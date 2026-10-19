@@ -20,7 +20,8 @@ export type NavIcon =
   | 'attendance'
   | 'diary'
   | 'homework'
-  | 'staff-attendance';
+  | 'staff-attendance'
+  | 'fees';
 
 export interface LiveNavItem {
   kind: 'live';
@@ -60,6 +61,7 @@ const LIVE: LiveRule[] = [
   { label: 'Homework', to: '/child/homework', icon: 'homework', anyOf: ['child.view'] },
   { label: 'Attendance', to: '/child/attendance', icon: 'attendance', anyOf: ['child.view'] },
   { label: 'Diary', to: '/child/diary', icon: 'diary', anyOf: ['child.view'] },
+  { label: 'Fees', to: '/child/fees', icon: 'fees', anyOf: ['child.view'] },
   // staff: academics (M2)
   { label: 'Schedule', to: '/schedule', icon: 'schedule', anyOf: ['timetable.read_all'] },
   { label: 'Homework', to: '/homework', icon: 'homework', anyOf: ['academic.read_all', 'lessons.teach'] },
@@ -72,6 +74,8 @@ const LIVE: LiveRule[] = [
     icon: 'staff-attendance',
     anyOf: ['staff_attendance.read'],
   },
+  // fees (M3)
+  { label: 'Fees', to: '/fees', icon: 'fees', anyOf: ['fees.read'] },
   // office (M1, M1b)
   { label: 'Students', to: '/students', icon: 'students', anyOf: ['students.read_all'] },
   { label: 'Admissions', to: '/admissions', icon: 'admissions', anyOf: ['admissions.manage'] },
@@ -89,8 +93,6 @@ const LIVE: LiveRule[] = [
 ];
 
 const UPCOMING: UpcomingRule[] = [
-  { label: 'Fees', module: 'M3', anyOf: ['fees.read', 'fees.manage'] },
-  { label: 'Fees & receipts', module: 'M3', studentView: true },
   { label: 'Salary', module: 'M4', anyOf: ['staff_finance.read'] },
   { label: 'Activity logs', module: 'M4', anyOf: ['audit.read'] },
 ];

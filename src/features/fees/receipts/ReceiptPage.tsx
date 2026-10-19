@@ -26,17 +26,18 @@ export function ReceiptPage() {
           }
         />
         {state.posted && (
-          <p role="status" className="mb-3 rounded-md border border-green-700/40 p-3 text-sm" data-testid="posted-notice">
+          <p
+            role="status"
+            className="mb-3 rounded-md border border-green-700/40 p-3 text-sm"
+            data-testid="posted-notice"
+          >
             {state.replayed
               ? 'This payment was already saved — this is its receipt. Nothing was charged twice.'
               : 'Payment saved.'}
           </p>
         )}
       </div>
-      <DataState query={query}>
-        {(r) => <ReceiptView receipt={r} />}
-      </DataState>
+      <DataState query={query}>{(r) => <ReceiptView receipt={r} />}</DataState>
     </div>
   );
 }
-

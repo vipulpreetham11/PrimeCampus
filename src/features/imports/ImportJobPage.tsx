@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataState } from '@/components/shared/DataState';
 import { ErrorText } from '@/components/shared/ErrorText';
+import { MoneyText } from '@/components/shared/MoneyText';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { ProgressBar } from '@/components/shared/ProgressBar';
 import { Button } from '@/components/ui/button';
@@ -312,6 +313,7 @@ export function ImportJobPage() {
   const canSetup = useCan('setup.manage');
   const canStaff = useCan('staff.manage');
   const canStudents = useCan('students.manage');
+  const canFees = useCan('fees.manage');
   const [editing, setEditing] = useState<ImportRow | null>(null);
   const [removing, setRemoving] = useState<ImportRow | null>(null);
   const [closing, setClosing] = useState(false);
@@ -390,10 +392,12 @@ export function ImportJobPage() {
   const canCommit =
     info !== undefined &&
     (
-      { 'setup.manage': canSetup, 'staff.manage': canStaff, 'students.manage': canStudents } as Record<
-        string,
-        boolean
-      >
+      {
+        'setup.manage': canSetup,
+        'staff.manage': canStaff,
+        'students.manage': canStudents,
+        'fees.manage': canFees,
+      } as Record<string, boolean>
     )[info.commitCapability] === true;
 
   return (
@@ -436,6 +440,7 @@ export function ImportJobPage() {
       )}
 
       <CountTiles counts={job.counts} />
+      {first.amount_totals && <AmountTotals totals={first.amount_totals} />}
 
       {open ? (
         <Card>
@@ -565,5 +570,25 @@ export function ImportJobPage() {
         onConfirm={() => void doClose()}
       />
     </div>
+  );
+}
+
+/** Opening balances: the money behind the rows (server totals), before and after importing. */
+function AmountTotals({ totals }: { totals: { ready_paise: number; created_paise: number } }) {
+  return (
+    <dl className="grid gap-3 rounded-md border p-3 text-sm sm:grid-cols-2" data-testid="amount-totals">
+      <div>
+        <dt className="text-muted-foreground">Ready to import</dt>
+        <dd className="font-medium" data-testid="ready-amount">
+          <MoneyText paise={totals.ready_paise} />
+        </dd>
+      </div>
+      <div>
+        <dt className="text-muted-foreground">Imported so far</dt>
+        <dd className="font-medium" data-testid="created-amount">
+          <MoneyText paise={totals.created_paise} />
+        </dd>
+      </div>
+    </dl>
   );
 }

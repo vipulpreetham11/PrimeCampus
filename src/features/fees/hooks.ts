@@ -70,7 +70,11 @@ function useInvalidateSetup() {
   const key = useScopedKey();
   const qc = useQueryClient();
   return () =>
-    Promise.all(['fee-setup', 'fee-optional-roster', 'fee-preview'].map((f) => qc.invalidateQueries({ queryKey: key(f) })));
+    Promise.all(
+      ['fee-setup', 'fee-optional-roster', 'fee-preview'].map((f) =>
+        qc.invalidateQueries({ queryKey: key(f) }),
+      ),
+    );
 }
 
 // ------------------------------------------------------------------ setup
@@ -104,7 +108,10 @@ export function feeHeadArgs(v: FeeHeadInput) {
 }
 export function useSaveFeeHead() {
   const invalidate = useInvalidateSetup();
-  return useMutation({ mutationFn: (v: FeeHeadInput) => saveFeeHead(feeHeadArgs(v)), onSettled: () => invalidate() });
+  return useMutation({
+    mutationFn: (v: FeeHeadInput) => saveFeeHead(feeHeadArgs(v)),
+    onSettled: () => invalidate(),
+  });
 }
 
 export function useSaveReceivingAccount() {
@@ -137,15 +144,21 @@ export function feeTermArgs(v: FeeTermInput) {
 }
 export function useSaveFeeTerm() {
   const invalidate = useInvalidateSetup();
-  return useMutation({ mutationFn: (v: FeeTermInput) => saveFeeTerm(feeTermArgs(v)), onSettled: () => invalidate() });
+  return useMutation({
+    mutationFn: (v: FeeTermInput) => saveFeeTerm(feeTermArgs(v)),
+    onSettled: () => invalidate(),
+  });
 }
 
 /** Only priced heads are sent; a head left out is "No price" for that class and term. */
 export function useSaveFeeStructure() {
   const invalidate = useInvalidateSetup();
   return useMutation({
-    mutationFn: (v: { termId: string; classId: string; lines: { fee_head_id: string; amount_paise: number }[] }) =>
-      saveFeeStructure({ p_fee_term_id: v.termId, p_class_id: v.classId, p_lines: v.lines }),
+    mutationFn: (v: {
+      termId: string;
+      classId: string;
+      lines: { fee_head_id: string; amount_paise: number }[];
+    }) => saveFeeStructure({ p_fee_term_id: v.termId, p_class_id: v.classId, p_lines: v.lines }),
     onSettled: () => invalidate(),
   });
 }
@@ -165,14 +178,19 @@ export function presetArgs(v: PresetInput) {
     p_name: v.name,
     p_kind: v.kind,
     p_fee_head_ids: v.fee_head_ids,
-    ...(v.kind === 'percent' ? { p_percent_bp: v.percent_bp ?? undefined } : { p_fixed_paise: v.fixed_paise ?? undefined }),
+    ...(v.kind === 'percent'
+      ? { p_percent_bp: v.percent_bp ?? undefined }
+      : { p_fixed_paise: v.fixed_paise ?? undefined }),
     p_status: v.status,
     ...(v.id ? { p_id: v.id, p_expected_version: v.version } : {}),
   };
 }
 export function useSavePreset() {
   const invalidate = useInvalidateSetup();
-  return useMutation({ mutationFn: (v: PresetInput) => saveConcessionPreset(presetArgs(v)), onSettled: () => invalidate() });
+  return useMutation({
+    mutationFn: (v: PresetInput) => saveConcessionPreset(presetArgs(v)),
+    onSettled: () => invalidate(),
+  });
 }
 
 export function useSaveLateFeeRule() {
@@ -217,7 +235,12 @@ export function setOptionalArgs(
   headId: string,
   changes: { student_id: string; enabled: boolean }[],
 ) {
-  return { p_operation_id: operationId, p_academic_year_id: yearId, p_fee_head_id: headId, p_changes: changes };
+  return {
+    p_operation_id: operationId,
+    p_academic_year_id: yearId,
+    p_fee_head_id: headId,
+    p_changes: changes,
+  };
 }
 export function useSetOptionalFees() {
   const invalidate = useInvalidateSetup();
@@ -244,7 +267,8 @@ export function useStatement(studentId: string | null) {
   const key = useScopedKey();
   return useQuery({
     queryKey: key('fee-statement', studentId),
-    queryFn: ({ signal }) => getStudentStatement({ p_student_id: routeId(studentId ?? undefined) }, { signal }),
+    queryFn: ({ signal }) =>
+      getStudentStatement({ p_student_id: routeId(studentId ?? undefined) }, { signal }),
     enabled: studentId !== null,
     staleTime: 0,
   });
@@ -260,7 +284,11 @@ export function useReceipt(receiptId: string | undefined) {
 }
 
 // ------------------------------------------------------------------ concessions
-export function useStudentConcessions(f: { yearId: string | null; studentId: string | null; includeRevoked: boolean }) {
+export function useStudentConcessions(f: {
+  yearId: string | null;
+  studentId: string | null;
+  includeRevoked: boolean;
+}) {
   const key = useScopedKey();
   return useInfiniteQuery({
     queryKey: key('fee-concessions', f.yearId, f.studentId, f.includeRevoked),
@@ -319,7 +347,10 @@ export function useTermPreview(termId: string | null, sectionId: string | null, 
   return useQuery({
     queryKey: key('fee-preview', termId, sectionId, run),
     queryFn: ({ signal }) =>
-      previewTermInvoices({ p_term_id: termId!, ...(sectionId ? { p_section_id: sectionId } : {}) }, { signal }),
+      previewTermInvoices(
+        { p_term_id: termId!, ...(sectionId ? { p_section_id: sectionId } : {}) },
+        { signal },
+      ),
     enabled: termId !== null && run > 0,
     refetchOnWindowFocus: false,
     staleTime: Infinity,
@@ -327,7 +358,11 @@ export function useTermPreview(termId: string | null, sectionId: string | null, 
 }
 
 export function issueArgs(operationId: string, termId: string, sectionId: string | null) {
-  return { p_operation_id: operationId, p_term_id: termId, ...(sectionId ? { p_section_id: sectionId } : {}) };
+  return {
+    p_operation_id: operationId,
+    p_term_id: termId,
+    ...(sectionId ? { p_section_id: sectionId } : {}),
+  };
 }
 export function useIssueTermInvoices() {
   const invalidate = useInvalidateMoney();
@@ -391,7 +426,8 @@ export function useAddAdjustment() {
 export function useWaiveLateFee() {
   const invalidate = useInvalidateMoney();
   return useMutation({
-    mutationFn: (v: { invoiceId: string; reason: string }) => waiveLateFee({ p_invoice_id: v.invoiceId, p_reason: v.reason }),
+    mutationFn: (v: { invoiceId: string; reason: string }) =>
+      waiveLateFee({ p_invoice_id: v.invoiceId, p_reason: v.reason }),
     onSettled: () => void invalidate(),
   });
 }
@@ -515,7 +551,10 @@ export function useRecordException() {
   });
 }
 
-export function reverseArgs(operationId: string, v: { collectionId: string; reason: string; amount: number | null }) {
+export function reverseArgs(
+  operationId: string,
+  v: { collectionId: string; reason: string; amount: number | null },
+) {
   return {
     p_operation_id: operationId,
     p_collection_id: v.collectionId,

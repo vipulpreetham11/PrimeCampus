@@ -81,7 +81,9 @@ export function paiseToCsvRupees(paise: Paise): string {
 const PERCENT_PATTERN = /^(\d{1,3})(?:\.(\d{1,2}))?\s*%?$/;
 
 /** "12.5" / "12.5%" → 1250 basis points (1% = 100). 0.01%–100%; string math only. */
-export function parsePercentToBasisPoints(input: string): { ok: true; bp: number } | { ok: false; error: string } {
+export function parsePercentToBasisPoints(
+  input: string,
+): { ok: true; bp: number } | { ok: false; error: string } {
   const m = PERCENT_PATTERN.exec(input.trim());
   if (!m) return { ok: false, error: 'Enter a percentage like 10 or 12.5 (at most 2 decimal places)' };
   const bp = Number(m[1]! + (m[2] ?? '').padEnd(2, '0'));
@@ -92,7 +94,9 @@ export function parsePercentToBasisPoints(input: string): { ok: true; bp: number
 /** 1250 → "12.5%", 1000 → "10%", 5 → "0.05%". */
 export function formatBasisPoints(bp: number): string {
   const whole = Math.trunc(bp / 100);
-  const frac = String(bp % 100).padStart(2, '0').replace(/0+$/, '');
+  const frac = String(bp % 100)
+    .padStart(2, '0')
+    .replace(/0+$/, '');
   return `${whole}${frac ? `.${frac}` : ''}%`;
 }
 

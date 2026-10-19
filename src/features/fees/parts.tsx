@@ -1,5 +1,5 @@
 import { useId, useState, type ReactNode } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router';
+import { Navigate, NavLink, Outlet, useLocation } from 'react-router';
 import { CloudOff, Search } from 'lucide-react';
 import { ErrorText } from '@/components/shared/ErrorText';
 import { Badge } from '@/components/ui/badge';
@@ -131,8 +131,8 @@ export function UnconfirmedNotice({
         Not confirmed — check the statement before trying again.
       </p>
       <p>
-        We don&apos;t know whether this {what} was saved. Trying again is safe: it sends the same {what}, and the
-        server never saves it twice.
+        We don&apos;t know whether this {what} was saved. Trying again is safe: it sends the same {what}, and
+        the server never saves it twice.
       </p>
       {error.code !== 'NETWORK' && error.code !== 'CONFLICT' && <ErrorText error={error} />}
       {children}
@@ -213,7 +213,10 @@ export function StudentPicker({
     <div className="space-y-2">
       <Label htmlFor={inputId}>{label}</Label>
       <div className="relative">
-        <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" aria-hidden="true" />
+        <Search
+          className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2"
+          aria-hidden="true"
+        />
         <Input
           id={inputId}
           value={text}
@@ -259,4 +262,9 @@ export function StudentPicker({
       )}
     </div>
   );
+}
+
+/** "/fees" → the role's main fee screen. */
+export function FeesIndex() {
+  return <Navigate to={useFeesHome()} replace />;
 }

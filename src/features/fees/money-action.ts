@@ -58,7 +58,8 @@ export function useMoneyAction<P, R>(
       } catch (e) {
         const error = toAppError(e);
         tracker.failed(error, { keep });
-        const uncertain = isUncertainFailure(error) || (isAppError(error) && (keep ?? []).includes(error.code));
+        const uncertain =
+          isUncertainFailure(error) || (isAppError(error) && (keep ?? []).includes(error.code));
         if (uncertain) {
           setPending(payload);
           setState({ kind: 'unconfirmed', error });
@@ -78,7 +79,10 @@ export function useMoneyAction<P, R>(
     (payload: P) => (pending !== null ? Promise.resolve(null) : attempt(payload)),
     [attempt, pending],
   );
-  const retry = useCallback(() => (pending === null ? Promise.resolve(null) : attempt(pending)), [attempt, pending]);
+  const retry = useCallback(
+    () => (pending === null ? Promise.resolve(null) : attempt(pending)),
+    [attempt, pending],
+  );
   const discard = useCallback(() => {
     tracker.discard();
     setPending(null);

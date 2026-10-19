@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useState } from 'react';
-import { Link, useBlocker } from 'react-router';
+import { Link, useBlocker, useSearchParams } from 'react-router';
 import { Download, FileSpreadsheet, TriangleAlert } from 'lucide-react';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataState } from '@/components/shared/DataState';
@@ -109,10 +109,12 @@ function DatasetStep({
   const canSetup = useCan('setup.manage');
   const canStaff = useCan('staff.manage');
   const canStudents = useCan('students.manage');
+  const canFees = useCan('fees.manage');
   const allowed: Record<string, boolean> = {
     'setup.manage': canSetup,
     'staff.manage': canStaff,
     'students.manage': canStudents,
+    'fees.manage': canFees,
   };
   return (
     <fieldset className="space-y-2" disabled={locked}>
@@ -361,7 +363,12 @@ function MappingStep({
 export function NewImportPage() {
   const currentYear = useCurrentYearId();
   const snapshot = useSetupSnapshot(null);
-  const [dataset, setDataset] = useState<ImportDataset | null>(null);
+  // ?dataset=opening_balances (from Fees → Invoices) preselects the dataset
+  const [params] = useSearchParams();
+  const [dataset, setDataset] = useState<ImportDataset | null>(() => {
+    const d = params.get('dataset');
+    return d && (DATASET_ORDER as string[]).includes(d) ? (d as ImportDataset) : null;
+  });
   const [yearId, setYearId] = useState<string | null>(currentYear);
   const [fileState, setFileState] = useState<FileState>({ kind: 'empty' });
   const [edited, setEdited] = useState<{

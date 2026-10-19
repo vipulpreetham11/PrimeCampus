@@ -67,10 +67,20 @@ export function StatementPage() {
               <Button asChild size="sm">
                 <Link to={`/fees/collect?student=${studentId}`}>Collect payment</Link>
               </Button>
-              <Button size="sm" variant="outline" onClick={() => setOpen({ kind: 'grant' })} disabled={!yearId}>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setOpen({ kind: 'grant' })}
+                disabled={!yearId}
+              >
                 Grant concession
               </Button>
-              <Button size="sm" variant="outline" onClick={() => setOpen({ kind: 'opening' })} disabled={!yearId}>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setOpen({ kind: 'opening' })}
+                disabled={!yearId}
+              >
                 Add opening balance
               </Button>
             </>
@@ -96,16 +106,28 @@ export function StatementPage() {
                   ? (inv) =>
                       inv.status === 'issued' ? (
                         <>
-                          <Button size="sm" variant="outline" onClick={() => setOpen({ kind: 'adjust', inv })}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setOpen({ kind: 'adjust', inv })}
+                          >
                             Add adjustment
                           </Button>
                           {hasUnwaivedLateFee(inv) && (
-                            <Button size="sm" variant="outline" onClick={() => setOpen({ kind: 'waive', inv })}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setOpen({ kind: 'waive', inv })}
+                            >
                               Waive late fee
                             </Button>
                           )}
                           {inv.paid_paise === 0 && (
-                            <Button size="sm" variant="outline" onClick={() => setOpen({ kind: 'cancel', inv })}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setOpen({ kind: 'cancel', inv })}
+                            >
                               Cancel invoice
                             </Button>
                           )}
@@ -121,7 +143,9 @@ export function StatementPage() {
                           Reverse
                         </Button>
                       ) : col.method === 'cheque' ? (
-                        <span className="text-muted-foreground text-xs">A cheque payment is undone by bouncing the cheque.</span>
+                        <span className="text-muted-foreground text-xs">
+                          A cheque payment is undone by bouncing the cheque.
+                        </span>
                       ) : null
                   : undefined
               }
@@ -134,7 +158,12 @@ export function StatementPage() {
               />
             )}
             {open?.kind === 'grant' && studentId && yearId && (
-              <GrantConcessionDialog studentId={studentId} studentName={nameOf(st)} yearId={yearId} onClose={close} />
+              <GrantConcessionDialog
+                studentId={studentId}
+                studentName={nameOf(st)}
+                yearId={yearId}
+                onClose={close}
+              />
             )}
           </>
         )}
@@ -202,10 +231,18 @@ function ConcessionsCard({
               {d.pages
                 .flatMap((p) => p.items)
                 .map((sc) => (
-                  <li key={sc.id} className="flex flex-wrap items-center gap-2 p-3" data-testid={`concession-${sc.preset_name}`}>
+                  <li
+                    key={sc.id}
+                    className="flex flex-wrap items-center gap-2 p-3"
+                    data-testid={`concession-${sc.preset_name}`}
+                  >
                     <span className="font-medium">{sc.preset_name}</span>
                     <span>
-                      {sc.kind === 'percent' ? formatBasisPoints(sc.percent_bp ?? 0) : <MoneyText paise={sc.fixed_paise} />}
+                      {sc.kind === 'percent' ? (
+                        formatBasisPoints(sc.percent_bp ?? 0)
+                      ) : (
+                        <MoneyText paise={sc.fixed_paise} />
+                      )}
                     </span>
                     <span>{sc.term ? `${sc.term} only` : 'Whole year'}</span>
                     {sc.status === 'revoked' && <Badge variant="outline">Revoked</Badge>}

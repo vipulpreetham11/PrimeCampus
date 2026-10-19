@@ -501,6 +501,8 @@ describe('capability-driven navigation (never role names)', () => {
       'Homework /child/homework',
       'Attendance /child/attendance',
       'Diary /child/diary',
+      // M3
+      'Fees /child/fees',
     ]);
   });
 

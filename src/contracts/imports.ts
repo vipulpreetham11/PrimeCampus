@@ -7,7 +7,13 @@ import { z } from '@/lib/zod';
 
 const id = z.guid();
 
-export const IMPORT_DATASETS = ['classes_sections', 'staff', 'students_guardians', 'placements'] as const;
+export const IMPORT_DATASETS = [
+  'classes_sections',
+  'staff',
+  'students_guardians',
+  'placements',
+  'opening_balances',
+] as const;
 export type ImportDataset = (typeof IMPORT_DATASETS)[number];
 
 /** Server filters of get_import_job. */
@@ -117,6 +123,11 @@ export const importJobPageSchema = z.object({
   columns: z.array(templateColumnSchema),
   rows: z.array(importRowSchema),
   next_cursor: z.number().int().nullable(),
+  // opening_balances only (migration 2300): rupee totals of the rows ready to import / imported
+  amount_totals: z
+    .object({ ready_paise: z.number().int(), created_paise: z.number().int() })
+    .nullable()
+    .optional(),
 });
 export type ImportJobPage = z.infer<typeof importJobPageSchema>;
 

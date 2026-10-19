@@ -30,7 +30,14 @@ import { ACCOUNT_KINDS_FOR, ACCOUNT_KIND_LABELS, METHOD_LABELS } from '../labels
 import { useMoneyAction } from '../money-action';
 import { StudentPicker, UnconfirmedNotice } from '../parts';
 import { StudentHeading } from '../statement/StatementView';
-import { allocationList, checkAllocation, oldestFirst, openInvoices, totalCap, type Allocations } from './allocation';
+import {
+  allocationList,
+  checkAllocation,
+  oldestFirst,
+  openInvoices,
+  totalCap,
+  type Allocations,
+} from './allocation';
 import { ExceptionDialog } from './ExceptionDialog';
 
 // Collect payment (brief §4): the accountant's main screen. Find student → open invoices → method,
@@ -43,7 +50,10 @@ export function CollectPage() {
   const statement = useStatement(studentId);
   return (
     <div className="space-y-4">
-      <PageHeader title="Collect payment" description="Cash, UPI, bank transfer or cheque, for one student at a time." />
+      <PageHeader
+        title="Collect payment"
+        description="Cash, UPI, bank transfer or cheque, for one student at a time."
+      />
       <Card>
         <CardContent className="pt-6">
           <StudentPicker
@@ -172,7 +182,8 @@ function CollectForm({ studentId, statement }: { studentId: string; statement: S
         allocations,
       }),
     );
-    if (r) navigate(`/fees/receipts/${r.receipt_id}`, { state: { posted: true, replayed: r.replayed === true } });
+    if (r)
+      navigate(`/fees/receipts/${r.receipt_id}`, { state: { posted: true, replayed: r.replayed === true } });
   };
 
   const retry = async () => {
@@ -191,8 +202,8 @@ function CollectForm({ studentId, statement }: { studentId: string; statement: S
             {chequeDone.replayed ? 'This cheque was already recorded.' : 'Cheque recorded — pending.'}
           </p>
           <p className="text-sm">
-            A pending cheque does <strong>not</strong> reduce the dues. It counts as paid only when it is cleared in
-            the Cheques register; the receipt is made then.
+            A pending cheque does <strong>not</strong> reduce the dues. It counts as paid only when it is
+            cleared in the Cheques register; the receipt is made then.
           </p>
           <div className="flex flex-wrap gap-2">
             <Button asChild variant="outline">
@@ -228,8 +239,8 @@ function CollectForm({ studentId, statement }: { studentId: string; statement: S
           {statement.pending_cheques.length > 0 && (
             <span>
               Pending cheques:{' '}
-              <MoneyText paise={statement.pending_cheques.reduce((s, c) => s + c.amount_paise, 0)} /> (not counted as
-              paid)
+              <MoneyText paise={statement.pending_cheques.reduce((s, c) => s + c.amount_paise, 0)} /> (not
+              counted as paid)
             </span>
           )}
           <Link to={`/fees/students/${studentId}`} className="underline">
@@ -281,7 +292,13 @@ function CollectForm({ studentId, statement }: { studentId: string; statement: S
               </div>
               <div className="space-y-1">
                 <Label htmlFor={ids.date}>{isCheque ? 'Cheque received on' : 'Received on'}</Label>
-                <DateInput id={ids.date} value={receivedOn} max={today} onChange={setReceivedOn} invalid={!dateOk} />
+                <DateInput
+                  id={ids.date}
+                  value={receivedOn}
+                  max={today}
+                  onChange={setReceivedOn}
+                  invalid={!dateOk}
+                />
                 {!dateOk && <p className="text-destructive text-sm">Today or an earlier date</p>}
               </div>
             </div>
@@ -290,10 +307,18 @@ function CollectForm({ studentId, statement }: { studentId: string; statement: S
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1">
                   <Label htmlFor={ids.account}>
-                    {isCheque ? 'Deposit into (bank account)' : needsAccount ? 'Received into' : 'Cash desk (optional)'}
+                    {isCheque
+                      ? 'Deposit into (bank account)'
+                      : needsAccount
+                        ? 'Received into'
+                        : 'Cash desk (optional)'}
                   </Label>
                   <Select value={accountId} onValueChange={setAccountId}>
-                    <SelectTrigger id={ids.account} className="w-full" aria-label={isCheque ? 'Deposit into' : 'Received into'}>
+                    <SelectTrigger
+                      id={ids.account}
+                      className="w-full"
+                      aria-label={isCheque ? 'Deposit into' : 'Received into'}
+                    >
                       <SelectValue placeholder="Choose an account" />
                     </SelectTrigger>
                     <SelectContent>
@@ -311,15 +336,25 @@ function CollectForm({ studentId, statement }: { studentId: string; statement: S
                     </SelectContent>
                   </Select>
                   {needsAccount && accounts.length === 0 && setup.isSuccess && (
-                    <p className="text-sm">No active account for {METHOD_LABELS[method]}. Add one in Fee setup.</p>
+                    <p className="text-sm">
+                      No active account for {METHOD_LABELS[method]}. Add one in Fee setup.
+                    </p>
                   )}
                   {touched && !accountOk && <p className="text-destructive text-sm">Choose the account</p>}
                 </div>
                 {needsRef && (
                   <div className="space-y-1">
                     <Label htmlFor={ids.ref}>Transaction reference (UTR)</Label>
-                    <Input id={ids.ref} value={reference} maxLength={80} autoComplete="off" onChange={(e) => setReference(e.target.value)} />
-                    {touched && !refOk && <p className="text-destructive text-sm">At least 3 letters or digits</p>}
+                    <Input
+                      id={ids.ref}
+                      value={reference}
+                      maxLength={80}
+                      autoComplete="off"
+                      onChange={(e) => setReference(e.target.value)}
+                    />
+                    {touched && !refOk && (
+                      <p className="text-destructive text-sm">At least 3 letters or digits</p>
+                    )}
                   </div>
                 )}
               </div>
@@ -329,13 +364,28 @@ function CollectForm({ studentId, statement }: { studentId: string; statement: S
               <div className="grid gap-4 sm:grid-cols-3">
                 <div className="space-y-1">
                   <Label htmlFor={ids.chequeNo}>Cheque number</Label>
-                  <Input id={ids.chequeNo} value={chequeNo} inputMode="numeric" maxLength={10} onChange={(e) => setChequeNo(e.target.value.trim())} />
-                  {touched && !/^[0-9]{6,10}$/.test(chequeNo) && <p className="text-destructive text-sm">6–10 digits</p>}
+                  <Input
+                    id={ids.chequeNo}
+                    value={chequeNo}
+                    inputMode="numeric"
+                    maxLength={10}
+                    onChange={(e) => setChequeNo(e.target.value.trim())}
+                  />
+                  {touched && !/^[0-9]{6,10}$/.test(chequeNo) && (
+                    <p className="text-destructive text-sm">6–10 digits</p>
+                  )}
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor={ids.bank}>Bank (of the cheque)</Label>
-                  <Input id={ids.bank} value={bankName} maxLength={120} onChange={(e) => setBankName(e.target.value)} />
-                  {touched && bankName.trim() === '' && <p className="text-destructive text-sm">Enter the bank name</p>}
+                  <Input
+                    id={ids.bank}
+                    value={bankName}
+                    maxLength={120}
+                    onChange={(e) => setBankName(e.target.value)}
+                  />
+                  {touched && bankName.trim() === '' && (
+                    <p className="text-destructive text-sm">Enter the bank name</p>
+                  )}
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor={ids.chequeDate}>Cheque date</Label>
@@ -348,11 +398,21 @@ function CollectForm({ studentId, statement }: { studentId: string; statement: S
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1">
                   <Label htmlFor={ids.payer}>Paid by (optional)</Label>
-                  <Input id={ids.payer} value={payer} maxLength={200} onChange={(e) => setPayer(e.target.value)} />
+                  <Input
+                    id={ids.payer}
+                    value={payer}
+                    maxLength={200}
+                    onChange={(e) => setPayer(e.target.value)}
+                  />
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor={ids.notes}>Notes (optional)</Label>
-                  <Input id={ids.notes} value={notes} maxLength={1000} onChange={(e) => setNotes(e.target.value)} />
+                  <Input
+                    id={ids.notes}
+                    value={notes}
+                    maxLength={1000}
+                    onChange={(e) => setNotes(e.target.value)}
+                  />
                 </div>
               </div>
             )}
@@ -386,7 +446,10 @@ function CollectForm({ studentId, statement }: { studentId: string; statement: S
               {check.message ? ` · ${check.message}` : ' · adds up exactly'}
             </p>
             {check.extra > 0 && amount !== null && (
-              <div className="space-y-2 rounded-md border border-amber-600/50 p-3 text-sm" data-testid="overpayment">
+              <div
+                className="space-y-2 rounded-md border border-amber-600/50 p-3 text-sm"
+                data-testid="overpayment"
+              >
                 <p>
                   The amount is <strong>{formatPaise(check.extra)}</strong> more than this student&apos;s dues
                   {isCheque ? ' (after other pending cheques)' : ''}. Money above the dues is never credited.
@@ -419,8 +482,8 @@ function CollectForm({ studentId, statement }: { studentId: string; statement: S
               <ErrorText error={failure} />
               {duplicateReceipt && (
                 <p className="text-sm" data-testid="duplicate-receipt">
-                  Already posted on receipt <strong>{duplicateReceipt}</strong>. Check the Day book before collecting
-                  again.
+                  Already posted on receipt <strong>{duplicateReceipt}</strong>. Check the Day book before
+                  collecting again.
                 </p>
               )}
             </div>
@@ -443,7 +506,11 @@ function CollectForm({ studentId, statement }: { studentId: string; statement: S
           ) : (
             <div className="flex flex-wrap items-center gap-3">
               <Button type="submit" disabled={!canSave} data-testid="save-payment">
-                {action.state.kind === 'saving' ? 'Saving…' : isCheque ? 'Record cheque (pending)' : 'Save payment'}
+                {action.state.kind === 'saving'
+                  ? 'Saving…'
+                  : isCheque
+                    ? 'Record cheque (pending)'
+                    : 'Save payment'}
               </Button>
               {!canSave && touched && !frozen && (
                 <span className="text-muted-foreground text-sm">Fix the highlighted items first.</span>
@@ -530,7 +597,9 @@ function AllocationTable({
                 onChange={(p, err) => onChange(inv.invoice_id, p ?? 0, err !== null)}
                 invalid={!!rowErrors[inv.invoice_id] || serverRow === inv.invoice_id}
               />
-              {rowErrors[inv.invoice_id] && <p className="text-destructive mt-1 text-xs">{rowErrors[inv.invoice_id]}</p>}
+              {rowErrors[inv.invoice_id] && (
+                <p className="text-destructive mt-1 text-xs">{rowErrors[inv.invoice_id]}</p>
+              )}
             </div>
           </li>
         ))}

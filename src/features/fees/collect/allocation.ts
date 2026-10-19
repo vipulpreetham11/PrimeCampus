@@ -42,7 +42,9 @@ export function openInvoices(statement: Statement, forCheque: boolean): OpenInvo
         cap_paise: forCheque ? Math.max(0, i.balance_paise - p) : i.balance_paise,
       };
     })
-    .sort((a, b) => (a.due_date === b.due_date ? a.invoice_no.localeCompare(b.invoice_no) : a.due_date < b.due_date ? -1 : 1));
+    .sort((a, b) =>
+      a.due_date === b.due_date ? a.invoice_no.localeCompare(b.invoice_no) : a.due_date < b.due_date ? -1 : 1,
+    );
 }
 
 export type Allocations = Record<string, number>;
@@ -100,7 +102,11 @@ export function checkAllocation(
   else if (sum < amount) message = `${formatPaise(amount - sum)} still to allocate.`;
   else if (sum > amount) message = `Allocated ${formatPaise(sum - amount)} more than the amount received.`;
   const ok =
-    message === null && Object.keys(rowErrors).length === 0 && amount !== null && amount > 0 && sum === amount;
+    message === null &&
+    Object.keys(rowErrors).length === 0 &&
+    amount !== null &&
+    amount > 0 &&
+    sum === amount;
   return { ok, sum, extra, rowErrors, message };
 }
 

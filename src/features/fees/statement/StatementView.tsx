@@ -83,7 +83,11 @@ function InvoiceCard({ inv, actions }: { inv: StatementInvoice; actions?: ReactN
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
       >
-        {open ? <ChevronDown className="size-4" aria-hidden="true" /> : <ChevronRight className="size-4" aria-hidden="true" />}
+        {open ? (
+          <ChevronDown className="size-4" aria-hidden="true" />
+        ) : (
+          <ChevronRight className="size-4" aria-hidden="true" />
+        )}
         Details
       </Button>
       {open && (
@@ -230,7 +234,12 @@ export function StatementView({
           ) : (
             <ul className="divide-y rounded-md border">
               {[...statement.collections].reverse().map((c) => (
-                <CollectionItem key={c.collection_id} c={c} receiptHref={receiptHref} actions={collectionActions?.(c)} />
+                <CollectionItem
+                  key={c.collection_id}
+                  c={c}
+                  receiptHref={receiptHref}
+                  actions={collectionActions?.(c)}
+                />
               ))}
             </ul>
           )}
@@ -244,7 +253,11 @@ export function StatementView({
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
             {statement.pending_cheques.map((ch) => (
-              <div key={ch.cheque_id} className="rounded-md border p-3" data-testid={`pending-cheque-${ch.cheque_no}`}>
+              <div
+                key={ch.cheque_id}
+                className="rounded-md border p-3"
+                data-testid={`pending-cheque-${ch.cheque_no}`}
+              >
                 <p>
                   <span className="font-medium">Cheque {ch.cheque_no}</span> · {ch.bank_name} ·{' '}
                   <MoneyText paise={ch.amount_paise} /> · received {formatDate(ch.received_on)}
@@ -266,9 +279,14 @@ export function StatementView({
               </div>
             ))}
             {statement.bounced_cheques.map((ch) => (
-              <div key={ch.cheque_id} className="rounded-md border p-3" data-testid={`bounced-cheque-${ch.cheque_no}`}>
+              <div
+                key={ch.cheque_id}
+                className="rounded-md border p-3"
+                data-testid={`bounced-cheque-${ch.cheque_no}`}
+              >
                 <p>
-                  <span className="font-medium">Cheque {ch.cheque_no}</span> · <MoneyText paise={ch.amount_paise} />
+                  <span className="font-medium">Cheque {ch.cheque_no}</span> ·{' '}
+                  <MoneyText paise={ch.amount_paise} />
                 </p>
                 <p>
                   <Badge variant="destructive">Bounced</Badge>{' '}
