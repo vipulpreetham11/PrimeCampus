@@ -158,7 +158,9 @@ test('H-4. No CSP violation while a signed-in Admin uses the app (Demo School)',
       const w = window as unknown as { __csp: string[] };
       w.__csp = [];
       document.addEventListener('securitypolicyviolation', (e) => {
-        w.__csp.push(`${e.violatedDirective} ${e.blockedURI} at ${e.sourceFile}:${e.lineNumber}:${e.columnNumber}`);
+        w.__csp.push(
+          `${e.violatedDirective} ${e.blockedURI} at ${e.sourceFile}:${e.lineNumber}:${e.columnNumber}`,
+        );
       });
     });
     const consoleCsp: string[] = [];
