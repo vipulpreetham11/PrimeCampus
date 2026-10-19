@@ -101,9 +101,10 @@ export function RowStateBadge({ state, unmarkedLabel }: { state: RowState; unmar
 }
 
 /**
- * The left side of a compact roster row: the name (with roll number) on one line, then the row's
- * state in words and a short reference (admission / employee number), truncated rather than wrapped.
- * `extra` adds an optional third line (e.g. paid leave) only for the rows that have it.
+ * The left side of a compact roster row: the name (with roll number) on its own line, then the row's
+ * state in words and the reference (admission / employee number). The reference is never cut off
+ * (a tooltip can't be read on a phone, M2X): when it doesn't fit beside the state it wraps onto its
+ * own line. `extra` adds an optional line (e.g. paid leave) only for the rows that have it.
  */
 export function RosterRowLabel({
   lead,
@@ -127,13 +128,12 @@ export function RosterRowLabel({
         {lead !== undefined && <span className="text-muted-foreground mr-1.5 tabular-nums">{lead}</span>}
         {name}
       </p>
-      {/* slimmer badge padding here so a short admission number still fits beside "Not saved" */}
-      <div className="mt-0.5 flex min-w-0 items-center gap-1 [&_[data-slot=badge]]:px-1.5">
+      {/* slimmer badge (no vertical padding) so a wrapped reference keeps the row ≤ 72px at 375px */}
+      <div className="flex min-w-0 flex-wrap items-center gap-x-1 [&_[data-slot=badge]]:px-1.5 [&_[data-slot=badge]]:py-0">
         {badge}
         {reference !== undefined && (
           <span
-            className="text-muted-foreground min-w-0 truncate text-xs"
-            title={typeof reference === 'string' ? reference : undefined}
+            className="text-muted-foreground min-w-0 text-xs leading-4 break-all"
             data-testid="row-reference"
           >
             {referenceLabel && <span className="sr-only">{referenceLabel} </span>}
@@ -148,7 +148,7 @@ export function RosterRowLabel({
 
 /** Classes for a compact roster row (`li`): one line at 375px; a conflict wraps below. */
 export const ROSTER_ROW_CLASS =
-  'focus-visible:bg-accent/60 flex flex-wrap items-center gap-x-2 gap-y-2 px-2 py-2 outline-none sm:px-3';
+  'focus-visible:bg-accent/60 flex flex-wrap items-center gap-x-2 gap-y-2 px-2 py-1.5 outline-none sm:px-3 sm:py-2';
 /** Classes for the row's choice buttons: on the right, never wrapping under the name. */
 export const ROSTER_CHOICES_CLASS = 'shrink-0 flex-nowrap';
 
