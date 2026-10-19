@@ -368,7 +368,7 @@ export type Database = {
           p_academic_year_id: string
           p_amount_paise: number
           p_ctx_rev: number
-          p_due_date: string
+          p_due_date?: string
           p_fee_head_id: string
           p_origin_label: string
           p_source_ref: string

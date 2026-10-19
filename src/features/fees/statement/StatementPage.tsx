@@ -199,7 +199,7 @@ export function StatementPage() {
   );
 }
 
-const nameOf = (st: Statement) => st.student?.name ?? null;
+const nameOf = (st: Statement) => st.student.name;
 
 function ConcessionsCard({
   studentId,

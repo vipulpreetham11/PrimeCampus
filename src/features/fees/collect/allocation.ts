@@ -16,14 +16,14 @@ export interface OpenInvoice {
   balance_paise: number;
   /** What this payment may put on the invoice. */
   cap_paise: number;
-  /** Planned by other pending cheques (known from migration 2320; 0 before). */
+  /** Planned by other pending cheques on this invoice. */
   planned_paise: number;
 }
 
 export function openInvoices(statement: Statement, forCheque: boolean): OpenInvoice[] {
   const planned = new Map<string, number>();
   for (const ch of statement.pending_cheques) {
-    for (const a of ch.planned_allocations ?? []) {
+    for (const a of ch.planned_allocations) {
       planned.set(a.invoice_id, (planned.get(a.invoice_id) ?? 0) + a.amount_paise);
     }
   }

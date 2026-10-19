@@ -173,6 +173,8 @@ describe('allocation (collect payment)', () => {
           bank_name: 'HDFC',
           amount_paise: 400000,
           received_on: '2026-10-18',
+          cheque_date: '2026-10-18',
+          version: 1,
           planned_allocations: [
             { invoice_id: M3.inv1, invoice_no: 'INV/2026-27/00001', amount_paise: 400000 },
           ],
@@ -243,7 +245,7 @@ describe('RPC payloads', () => {
     ).toEqual({ p_academic_year_id: 'y', p_only_overdue: false, p_only_with_balance: true });
   });
 
-  it('opening balance always sends p_due_date (null = the year start)', () => {
+  it('opening balance: no due date → p_due_date left out (the server uses the year start)', () => {
     const a = openingArgs({
       studentId: 's',
       yearId: 'y',
@@ -253,7 +255,18 @@ describe('RPC payloads', () => {
       reference: 'r',
       dueDate: null,
     });
-    expect(a).toHaveProperty('p_due_date', null);
+    expect(a).not.toHaveProperty('p_due_date');
+    expect(
+      openingArgs({
+        studentId: 's',
+        yearId: 'y',
+        headId: 'h',
+        amount: 1,
+        origin: 'o',
+        reference: 'r',
+        dueDate: '2026-07-01',
+      }),
+    ).toHaveProperty('p_due_date', '2026-07-01');
   });
 
   it('receiving account edit sends only changed keys; an emptied field is sent as "" (clears it)', () => {

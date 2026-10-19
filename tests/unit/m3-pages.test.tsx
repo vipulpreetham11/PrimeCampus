@@ -30,6 +30,7 @@ const { InvoicesPage } = await import('@/features/fees/invoices/InvoicesPage');
 const { ReceiptPage } = await import('@/features/fees/receipts/ReceiptPage');
 const { ChildFeesPage, ChildReceiptPage } = await import('@/features/fees/ChildFees');
 const { FeesLayout } = await import('@/features/fees/parts');
+const { DayBookPage } = await import('@/features/fees/reports/DayBookPage');
 
 const calls = (fn: string) => rpcCalls.filter((c) => c.fn === fn);
 const NETWORK_ERROR = { error: { message: 'TypeError: Failed to fetch' } };
@@ -270,6 +271,8 @@ describe('statement', () => {
                   bank_name: 'HDFC',
                   amount_paise: 100000,
                   received_on: '2026-10-18',
+                  cheque_date: '2026-10-18',
+                  version: 1,
                   planned_allocations: [
                     { invoice_id: M3.inv1, invoice_no: 'INV/2026-27/00001', amount_paise: 100000 },
                   ],
@@ -353,6 +356,49 @@ describe('dues report', () => {
     expect(totals).toHaveTextContent('₹4,500.00'); // balance 3500 + 1000
     expect(screen.getByTestId('dues-2024/002')).toHaveTextContent('Class not set');
     expect(calls('get_dues_report')[0]!.args).toMatchObject({ p_academic_year_id: ids.year });
+  });
+});
+
+// ------------------------------------------------------------------ day book
+describe('day book', () => {
+  const row = (n: number, amount: number) => ({
+    collection_id: `f3f3f3f3-0000-4000-8000-00000000000${n}`,
+    receipt_id: `f4f4f4f4-0000-4000-8000-00000000000${n}`,
+    receipt_no: `RCT/2026-27/0000${n}`,
+    received_on: '2026-10-19',
+    student_id: M3.student,
+    name: 'Aarav Sharma',
+    admission_no: '2024/001',
+    method: 'cash',
+    amount_paise: amount,
+    reversed_paise: 0,
+    external_ref: null,
+    payer_name: null,
+    account: 'Cash',
+    receiving_account_id: null,
+    collector: 'Demo Accountant',
+    collected_by: ids.account,
+    created_at: '2026-10-19T05:00:00Z',
+  });
+
+  it('totals are the server totals for the filters (all pages), not the sum of the rows loaded', async () => {
+    onRpc((fn) => {
+      if (fn === 'list_collections')
+        return {
+          data: {
+            items: [row(1, 100000), row(2, 50000)],
+            next_cursor: { before_date: '2026-10-19', before_id: 'f3f3f3f3-0000-4000-8000-000000000002' },
+            totals: { count: 7, amount_paise: 900000, reversed_paise: 30000 },
+          },
+        };
+      return baseReads(fn) ?? { data: null };
+    });
+    renderAt('/fees/day-book', [{ path: '/fees/day-book', element: <DayBookPage /> }]);
+    const totals = await screen.findByTestId('day-book-totals');
+    expect(totals).toHaveTextContent('Collections7');
+    expect(totals).toHaveTextContent('₹9,000.00');
+    expect(totals).toHaveTextContent('₹8,700.00');
+    expect(screen.getByRole('button', { name: 'Load more' })).toBeInTheDocument();
   });
 });
 

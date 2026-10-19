@@ -389,8 +389,8 @@ export function openingArgs(v: OpeningInput) {
     p_amount_paise: v.amount,
     p_origin_label: v.origin,
     p_source_ref: v.reference,
-    // Always sent: before migration 2320 the parameter has no default; null = the year's start.
-    p_due_date: v.dueDate as string,
+    // left out = the year's start (migration 2320 gave it a default)
+    ...(v.dueDate ? { p_due_date: v.dueDate } : {}),
   };
 }
 export function useIssueOpeningBalance() {

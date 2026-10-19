@@ -530,7 +530,7 @@ function CollectForm({ studentId, statement }: { studentId: string; statement: S
           open
           onOpenChange={setExceptionOpen}
           studentId={studentId}
-          studentName={statement.student?.name ?? null}
+          studentName={statement.student.name}
           initialAmount={check.extra}
           initialReference={reference.trim() || null}
           kind="overpayment"

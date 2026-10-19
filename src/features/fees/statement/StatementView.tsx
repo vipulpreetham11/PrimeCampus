@@ -14,10 +14,9 @@ import { Figure, OverdueBadge, PaymentStateBadge } from '../parts';
 // (child.view, read-only). Every amount comes from a loaded statement — the caller renders this only
 // inside DataState, so loading / failed / offline never look like "₹0 due" or "Paid".
 
-/** Student name, admission number and class (statement.student, migration 2320). */
+/** Student name, admission number and class (statement.student). */
 export function StudentHeading({ statement }: { statement: Statement }) {
   const s = statement.student;
-  if (!s) return <CardTitle className="text-base">Student fee statement</CardTitle>;
   return (
     <div className="min-w-0">
       <CardTitle className="text-base" data-testid="statement-student">
@@ -265,7 +264,7 @@ export function StatementView({
                 <p>
                   <Badge variant="outline">Pending — not counted as paid</Badge>
                 </p>
-                {ch.planned_allocations && ch.planned_allocations.length > 0 && (
+                {ch.planned_allocations.length > 0 && (
                   <p className="text-muted-foreground">
                     Planned for:{' '}
                     {ch.planned_allocations.map((a, i) => (

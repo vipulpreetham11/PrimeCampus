@@ -11,7 +11,12 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PAYMENT_METHODS, type CollectionRow, type PaymentMethod } from '@/contracts/fees';
+import {
+  PAYMENT_METHODS,
+  type CollectionRow,
+  type CollectionTotals,
+  type PaymentMethod,
+} from '@/contracts/fees';
 import { downloadBlob } from '@/features/imports/template';
 import { formatDate, schoolToday } from '@/lib/dates';
 import { toAppError, type AppError } from '@/lib/errors';
@@ -42,7 +47,6 @@ export function DayBookPage() {
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<AppError | null>(null);
   const rows: CollectionRow[] = query.data?.pages.flatMap((p) => p.items) ?? [];
-  const totals = query.data?.pages[0]?.totals;
   const rangeOk = draft.from !== '' && draft.to !== '' && draft.from <= draft.to;
 
   // collectors seen in the rows loaded (the RPC has no list of collectors); the chosen one stays listed
@@ -179,27 +183,11 @@ export function DayBookPage() {
         isEmpty={() => rows.length === 0}
         emptyTitle="No collections for these filters"
       >
-        {() => (
+        {(d) => (
           <Card>
             <CardContent className="space-y-3 pt-6">
-              {totals ? (
-                <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4" data-testid="day-book-totals">
-                  <Figure label="Collections">{totals.count}</Figure>
-                  <Figure label="Received">
-                    <MoneyText paise={totals.amount_paise} />
-                  </Figure>
-                  <Figure label="Reversed since">
-                    <MoneyText paise={totals.reversed_paise} />
-                  </Figure>
-                  <Figure label="Net">
-                    <MoneyText paise={totals.amount_paise - totals.reversed_paise} />
-                  </Figure>
-                </dl>
-              ) : (
-                <p className="text-muted-foreground text-sm" data-testid="day-book-totals">
-                  Totals for these filters are not available.
-                </p>
-              )}
+              {/* server totals for exactly these filters (every page), never a sum of the rows loaded so far */}
+              <DayBookTotals totals={d.pages[0]!.totals} />
               <ul className="divide-y rounded-md border text-sm" data-testid="day-book-rows">
                 {rows.map((r) => (
                   <li key={r.collection_id} className="space-y-0.5 p-3">
@@ -243,5 +231,22 @@ export function DayBookPage() {
         )}
       </DataState>
     </div>
+  );
+}
+
+function DayBookTotals({ totals }: { totals: CollectionTotals }) {
+  return (
+    <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4" data-testid="day-book-totals">
+      <Figure label="Collections">{totals.count}</Figure>
+      <Figure label="Received">
+        <MoneyText paise={totals.amount_paise} />
+      </Figure>
+      <Figure label="Reversed since">
+        <MoneyText paise={totals.reversed_paise} />
+      </Figure>
+      <Figure label="Net">
+        <MoneyText paise={totals.amount_paise - totals.reversed_paise} />
+      </Figure>
+    </dl>
   );
 }

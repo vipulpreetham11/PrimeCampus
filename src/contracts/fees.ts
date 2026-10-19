@@ -368,7 +368,9 @@ export const pendingChequeSchema = z.object({
   amount_paise: paise,
   received_on: isoDate,
   // migration 2320
-  planned_allocations: list(allocationSchema).optional(),
+  cheque_date: isoDate,
+  version: count,
+  planned_allocations: z.array(allocationSchema),
 });
 export type PendingCheque = z.infer<typeof pendingChequeSchema>;
 
@@ -382,16 +384,15 @@ export const bouncedChequeSchema = z.object({
 
 export const statementSchema = z.object({
   student_id: id,
-  // migration 2320
-  student: z
-    .object({
-      name: z.string(),
-      admission_no: z.string(),
-      class_section: z.string().nullable(),
-      status: z.string(),
-    })
-    .nullable()
-    .optional(),
+  // migration 2320: who the statement is for (every fees.read role, incl. Owner who can't list students)
+  student: z.object({
+    name: z.string(),
+    admission_no: z.string(),
+    status: z.string(),
+    class_id: id.nullable(),
+    section_id: id.nullable(),
+    class_section: z.string().nullable(),
+  }),
   invoices: z.array(statementInvoiceSchema),
   collections: z.array(statementCollectionSchema),
   pending_cheques: z.array(pendingChequeSchema),
@@ -509,8 +510,8 @@ export type CollectionTotals = z.infer<typeof collectionTotalsSchema>;
 export const collectionPageSchema = z.object({
   items: z.array(collectionRowSchema),
   next_cursor: dateCursor,
-  // migration 2320: totals for the same filters (all pages)
-  totals: collectionTotalsSchema.nullable().optional(),
+  // migration 2320: totals for exactly the same filters (every page, not just this one)
+  totals: collectionTotalsSchema,
 });
 export type CollectionPage = z.infer<typeof collectionPageSchema>;
 
