@@ -1,7 +1,9 @@
-// Capability names returned by get_context().capabilities (migration 0900/0800, private.role_has_cap).
+// Capability names returned by get_context().capabilities (private.role_has_cap, last replaced in 2200).
 // UI visibility is derived from these only — never from role names (CLAUDE.md rule 11).
 export const CAPABILITIES = [
   'staff.member',
+  'child.view',
+  'lessons.teach',
   'setup.manage',
   'users.manage',
   'students.read_all',

@@ -5,7 +5,22 @@ import type { ActiveContext } from '@/contracts/session';
 // never from role names. Upcoming areas are listed as plain text — never clickable (PRD §15).
 
 export type NavIcon =
-  'dashboard' | 'setup' | 'calendar' | 'students' | 'admissions' | 'staff' | 'users' | 'imports' | 'operator';
+  | 'dashboard'
+  | 'setup'
+  | 'calendar'
+  | 'students'
+  | 'admissions'
+  | 'staff'
+  | 'users'
+  | 'imports'
+  | 'operator'
+  | 'today'
+  | 'timetable'
+  | 'schedule'
+  | 'attendance'
+  | 'diary'
+  | 'homework'
+  | 'staff-attendance';
 
 export interface LiveNavItem {
   kind: 'live';
@@ -37,8 +52,27 @@ interface LiveRule {
   unless?: Capability[];
 }
 
-// M1 areas (live). Order is the sidebar order; phones show the first few in the bottom bar.
+// Live areas. Order is the sidebar order; phones show the first few in the bottom bar, so the areas
+// used every day (M2) come before the office set-up screens (M1).
 const LIVE: LiveRule[] = [
+  // parent / student: the selected child's pages
+  { label: 'Timetable', to: '/child/timetable', icon: 'timetable', anyOf: ['child.view'] },
+  { label: 'Homework', to: '/child/homework', icon: 'homework', anyOf: ['child.view'] },
+  { label: 'Attendance', to: '/child/attendance', icon: 'attendance', anyOf: ['child.view'] },
+  { label: 'Diary', to: '/child/diary', icon: 'diary', anyOf: ['child.view'] },
+  // staff: academics (M2)
+  { label: 'Schedule', to: '/schedule', icon: 'schedule', anyOf: ['timetable.read_all'] },
+  { label: 'Homework', to: '/homework', icon: 'homework', anyOf: ['academic.read_all', 'lessons.teach'] },
+  { label: 'Attendance', to: '/attendance', icon: 'attendance', anyOf: ['attendance.summary'] },
+  { label: 'Diary', to: '/diary', icon: 'diary', anyOf: ['academic.read_all', 'lessons.teach'] },
+  { label: 'Timetable', to: '/timetable', icon: 'timetable', anyOf: ['timetable.read_all'] },
+  {
+    label: 'Staff attendance',
+    to: '/staff-attendance',
+    icon: 'staff-attendance',
+    anyOf: ['staff_attendance.read'],
+  },
+  // office (M1, M1b)
   { label: 'Students', to: '/students', icon: 'students', anyOf: ['students.read_all'] },
   { label: 'Admissions', to: '/admissions', icon: 'admissions', anyOf: ['admissions.manage'] },
   { label: 'Staff', to: '/staff', icon: 'staff', anyOf: ['staff.read'] },
@@ -55,23 +89,23 @@ const LIVE: LiveRule[] = [
 ];
 
 const UPCOMING: UpcomingRule[] = [
-  { label: 'Timetable', module: 'M2', anyOf: ['timetable.read_all', 'timetable.manage'] },
-  { label: 'Attendance', module: 'M2', anyOf: ['attendance.read_all', 'attendance.mark_any'] },
-  { label: 'Diary & homework', module: 'M2', anyOf: ['academic.read_all', 'academic.correct'] },
-  { label: 'Attendance, diary & homework', module: 'M2', studentView: true },
   { label: 'Fees', module: 'M3', anyOf: ['fees.read', 'fees.manage'] },
   { label: 'Fees & receipts', module: 'M3', studentView: true },
-  {
-    label: 'Staff attendance & salary',
-    module: 'M4',
-    anyOf: ['staff_attendance.read', 'staff_finance.read'],
-  },
+  { label: 'Salary', module: 'M4', anyOf: ['staff_finance.read'] },
   { label: 'Activity logs', module: 'M4', anyOf: ['audit.read'] },
 ];
 
+/** The home destination's label: a teacher's home is "Today", a parent's or student's is "Home". */
+export function homeLabel(context: ActiveContext): { label: string; icon: NavIcon } {
+  const caps = context.capabilities;
+  if (caps.includes('lessons.teach')) return { label: 'Today', icon: 'today' };
+  if (caps.includes('child.view')) return { label: 'Home', icon: 'dashboard' };
+  return { label: 'Dashboard', icon: 'dashboard' };
+}
+
 export function buildNav(context: ActiveContext | null, isOperator: boolean): NavItem[] {
   const items: NavItem[] = [];
-  if (context) items.push({ kind: 'live', label: 'Dashboard', to: '/dashboard', icon: 'dashboard' });
+  if (context) items.push({ kind: 'live', to: '/dashboard', ...homeLabel(context) });
   const caps = new Set(context?.capabilities ?? []);
   if (context) {
     for (const r of LIVE) {

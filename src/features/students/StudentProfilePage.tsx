@@ -4,6 +4,7 @@ import { DataState } from '@/components/shared/DataState';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { StudentAttendance } from '@/features/attendance/StudentAttendance';
 import type { ProfileGuardian, StudentProfile } from '@/contracts/students';
 import { addDays, formatDate } from '@/lib/dates';
 import { LinkLoginCard } from '@/features/users/LinkLoginCard';
@@ -211,6 +212,17 @@ export function StudentProfilePage() {
                   )}
                 </CardContent>
               </Card>
+
+              {data.can.attendance && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Attendance</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <StudentAttendance studentId={s.id} />
+                  </CardContent>
+                </Card>
+              )}
 
               {data.can.link_login && <LinkLoginCard kind="student" recordId={s.id} login={data.login} />}
               <SensitiveCard studentId={s.id} sensitive={data.sensitive} />

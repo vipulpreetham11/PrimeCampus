@@ -112,3 +112,84 @@ export function formatDateTime(instant: string | Date): string {
   if (Number.isNaN(d.getTime())) throw new RangeError(`Not a valid timestamp: ${String(instant)}`);
   return DATE_TIME.format(d);
 }
+
+// ---------------------------------------------------------------------------
+// Week / month ranges for the schedule, attendance and homework screens (M2). All of these work on
+// the date string itself; none of them reads the device clock or zone.
+
+/** ISO weekday of a date: 1 = Monday … 7 = Sunday (the numbering the timetable uses). */
+export function isoWeekday(iso: IsoDate): number {
+  const [y, m, d] = parts(iso);
+  const wd = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  return wd === 0 ? 7 : wd;
+}
+
+/** Monday of the week containing `iso`. */
+export function weekStart(iso: IsoDate): IsoDate {
+  return addDays(iso, 1 - isoWeekday(iso));
+}
+
+/** The seven dates Monday … Sunday of the week containing `iso`. */
+export function weekDates(iso: IsoDate): IsoDate[] {
+  const monday = weekStart(iso);
+  return Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+}
+
+/** Last day of the month containing `iso`. */
+export function monthEnd(iso: IsoDate): IsoDate {
+  const [y, m] = parts(iso);
+  return `${pad(y, 4)}-${pad(m)}-${pad(daysInMonth(y, m))}`;
+}
+
+/** Whole days from `from` to `to` (to − from); negative when `to` is earlier. */
+export function daysBetween(from: IsoDate, to: IsoDate): number {
+  const [y1, m1, d1] = parts(from);
+  const [y2, m2, d2] = parts(to);
+  return Math.round((Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / 86_400_000);
+}
+
+/** The later of two dates. */
+export function maxDate(a: IsoDate, b: IsoDate): IsoDate {
+  return compareIsoDates(a, b) >= 0 ? a : b;
+}
+
+/** The earlier of two dates. */
+export function minDate(a: IsoDate, b: IsoDate): IsoDate {
+  return compareIsoDates(a, b) <= 0 ? a : b;
+}
+
+const WEEKDAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
+const WEEKDAY_LONG = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const;
+
+/** 1 → 'Mon' … 7 → 'Sun'. */
+export function weekdayShort(isoDay: number): string {
+  return WEEKDAY_SHORT[isoDay - 1] ?? String(isoDay);
+}
+
+/** 1 → 'Monday' … 7 → 'Sunday'. */
+export function weekdayLong(isoDay: number): string {
+  return WEEKDAY_LONG[isoDay - 1] ?? String(isoDay);
+}
+
+const DAY_MONTH = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+const MONTH_YEAR = new Intl.DateTimeFormat('en-IN', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+
+/** '2026-10-19' -> 'Mon 19 Oct'. */
+export function formatDayShort(iso: IsoDate): string {
+  return `${weekdayShort(isoWeekday(iso))} ${DAY_MONTH.format(asUtcNoon(iso))}`;
+}
+
+/** '2026-10-19' -> 'October 2026'. */
+export function formatMonth(iso: IsoDate): string {
+  return MONTH_YEAR.format(asUtcNoon(iso));
+}
+
+/** Postgres `time` ('09:05:00' or '09:05') -> '9:05 am'. Wall-clock school time; no zone conversion. */
+export function formatTime(time: string): string {
+  const m = /^(\d{2}):(\d{2})/.exec(time);
+  if (!m) throw new RangeError(`Not a valid time: ${time}`);
+  const h = Number(m[1]);
+  const suffix = h < 12 ? 'am' : 'pm';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${m[2]} ${suffix}`;
+}

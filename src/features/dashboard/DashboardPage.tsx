@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { Role } from '@/contracts/roles';
 import { useSession } from '@/lib/session/store';
 import { buildNav } from '@/app/navigation';
+import { ChildHomePage } from '@/features/child/ChildPages';
+import { TeacherTodayPage } from '@/features/teacher/TeacherTodayPage';
 
 // Placeholder per role dashboard (M0). No fake buttons or numbers (PRD §15): each page states
 // which module delivers it. Choosing the *text* by role is presentation only — access is
@@ -21,7 +23,6 @@ const PLACEHOLDERS: Record<Role, Placeholder> = {
     title: 'Operator overview',
     module: 'M4',
     upcoming: [
-      { label: 'Timetable, attendance, diary and homework', module: 'M2' },
       { label: 'Fees and receipts', module: 'M3' },
       { label: 'Activity, authentication and usage logs', module: 'M4' },
     ],
@@ -30,9 +31,8 @@ const PLACEHOLDERS: Record<Role, Placeholder> = {
     title: 'Admin operations dashboard',
     module: 'M4',
     upcoming: [
-      { label: 'Timetable, attendance, diary and homework', module: 'M2' },
       { label: 'Fees configuration, invoices, collections and receipts', module: 'M3' },
-      { label: 'Staff attendance and salary calculator', module: 'M4' },
+      { label: 'Salary calculator and operations dashboard', module: 'M4' },
     ],
   },
   accountant: {
@@ -45,10 +45,7 @@ const PLACEHOLDERS: Record<Role, Placeholder> = {
   principal: {
     title: 'Principal academics dashboard',
     module: 'M4',
-    upcoming: [
-      { label: 'Timetable, attendance, diary and homework views', module: 'M2' },
-      { label: 'Staff attendance', module: 'M4' },
-    ],
+    upcoming: [{ label: 'Academic dashboards and reports', module: 'M4' }],
   },
   owner: {
     title: 'Owner management dashboard',
@@ -85,6 +82,25 @@ export function DashboardPage() {
   const s = useSession();
   const ctx = s.context;
   if (!ctx) return null; // the route gate sends users without a context to the chooser
+  // A teacher's home is "Today"; a parent's / student's is the selected child's home (by capability).
+  if (ctx.capabilities.includes('lessons.teach')) {
+    return (
+      <div data-testid={`dashboard-${ctx.role}`}>
+        <TeacherTodayPage />
+      </div>
+    );
+  }
+  if (ctx.capabilities.includes('child.view')) {
+    return (
+      <div data-testid={`dashboard-${ctx.role}`}>
+        <PageHeader
+          title="Home"
+          description={`${ctx.school_name}${ctx.current_year ? ` · ${ctx.current_year.name}` : ''}`}
+        />
+        <ChildHomePage />
+      </div>
+    );
+  }
   const p = PLACEHOLDERS[ctx.role];
   // Same capability-driven list as the sidebar (never role names).
   const available = buildNav(ctx, s.account?.isOperator ?? false).filter(

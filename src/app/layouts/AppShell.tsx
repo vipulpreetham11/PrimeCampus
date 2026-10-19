@@ -2,9 +2,16 @@ import { useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router';
 import {
   ArrowLeftRight,
+  BookOpen,
   Briefcase,
+  CalendarClock,
   CalendarDays,
+  ClipboardCheck,
   ClipboardList,
+  Grid3x3,
+  NotebookPen,
+  Sun,
+  UserCheck,
   FileUp,
   GraduationCap,
   KeyRound,
@@ -45,6 +52,13 @@ const ICONS: Record<NavIcon, LucideIcon> = {
   users: Users,
   imports: FileUp,
   operator: School,
+  today: Sun,
+  timetable: Grid3x3,
+  schedule: CalendarClock,
+  attendance: ClipboardCheck,
+  diary: NotebookPen,
+  homework: BookOpen,
+  'staff-attendance': UserCheck,
 };
 
 function NavIconView({ icon, className }: { icon: NavIcon; className: string }) {
