@@ -64,7 +64,7 @@ function YearDialog({
       toast.success(year ? 'Academic year updated.' : 'Academic year created.');
       onOpenChange(false);
     } catch (e) {
-      setError(handleSaveError(e, { reload: onReload }));
+      setError(handleSaveError(e, { reload: onReload, form }));
     }
   });
   return (

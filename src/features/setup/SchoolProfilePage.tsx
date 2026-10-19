@@ -59,7 +59,7 @@ function ProfileForm({ profile, onReload }: { profile: SchoolProfile; onReload: 
       await save.mutateAsync({ p, version: profile.version });
       toast.success('School profile saved.');
     } catch (e) {
-      setError(handleSaveError(e, { reload: onReload }));
+      setError(handleSaveError(e, { reload: onReload, form }));
     }
   });
 

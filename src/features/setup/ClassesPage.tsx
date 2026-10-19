@@ -77,7 +77,7 @@ function ClassDialog({
       toast.success(cls ? 'Class updated.' : 'Class created.');
       onOpenChange(false);
     } catch (e) {
-      setError(handleSaveError(e, { reload: onReload }));
+      setError(handleSaveError(e, { reload: onReload, form }));
     }
   });
   return (
@@ -178,7 +178,7 @@ function SectionDialog({
       toast.success(section ? 'Section updated.' : 'Section created.');
       onOpenChange(false);
     } catch (e) {
-      setError(handleSaveError(e, { reload: onReload }));
+      setError(handleSaveError(e, { reload: onReload, form }));
     }
   });
   return (

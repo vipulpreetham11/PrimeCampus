@@ -128,7 +128,7 @@ export function StaffFormDialog({
       onOpenChange(false);
       onSaved?.(res.staff_id);
     } catch (e) {
-      setError(handleSaveError(e, { reload: onReload }));
+      setError(handleSaveError(e, { reload: onReload, form }));
     }
   });
 

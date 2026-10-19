@@ -66,7 +66,9 @@ function GroupDialog({
       toast.success(group ? 'Staff group saved.' : 'Staff group created.');
       onOpenChange(false);
     } catch (e) {
-      setError(handleSaveError(e, { reload: onReload }));
+      setError(
+        handleSaveError(e, { reload: onReload, form, fields: { default_salary: 'default_salary_paise' } }),
+      );
     }
   });
   return (

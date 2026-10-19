@@ -146,7 +146,9 @@ function SensitiveForm({
             toast.success('Sensitive details saved.');
             onDone();
           } catch (e) {
-            setError(handleSaveError(e));
+            setError(
+              handleSaveError(e, { form, fields: { family_annual_income: 'family_annual_income_paise' } }),
+            );
           }
         })}
       >

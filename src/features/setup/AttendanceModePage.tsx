@@ -108,7 +108,7 @@ export function AttendanceModePage() {
                     await save.mutateAsync(v);
                     toast.success(`${MODE_TEXT[v.mode].label} from ${formatDate(v.effective_from)}.`);
                   } catch (e) {
-                    setError(handleSaveError(e));
+                    setError(handleSaveError(e, { form }));
                   }
                 })}
               >

@@ -54,7 +54,7 @@ function SubjectDialog({
       toast.success(subject ? 'Subject updated.' : 'Subject created.');
       onOpenChange(false);
     } catch (e) {
-      setError(handleSaveError(e, { reload: onReload }));
+      setError(handleSaveError(e, { reload: onReload, form }));
     }
   });
   return (

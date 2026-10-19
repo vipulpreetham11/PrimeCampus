@@ -60,8 +60,8 @@ export function StudentEditDialog({
       toast.success('Student record saved.');
       onOpenChange(false);
     } catch (e) {
-      const err = handleSaveError(e, { reload: onReload });
-      if (err.code === 'CONFLICT') onOpenChange(false); // reopen to see the other person's change
+      const err = handleSaveError(e, { reload: onReload, form });
+      if (err?.code === 'CONFLICT') onOpenChange(false); // reopen to see the other person's change
       setError(err);
     }
   });
