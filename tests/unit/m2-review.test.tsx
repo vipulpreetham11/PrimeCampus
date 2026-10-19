@@ -22,7 +22,8 @@ import {
 } from './m2-fixtures';
 
 // M2 owner review fixes: roster batches keep their operation id by row ids; creates without an
-// operation id (save_homework create, copy_timetable) look for the row after an uncertain failure.
+// operation id (save_homework create, copy_timetable) are re-sent after an uncertain failure and
+// resolved by the 2310 DUPLICATE (M2X).
 
 vi.mock('@/lib/supabase', () => ({ supabase: fakeSupabase }));
 
@@ -140,38 +141,27 @@ function gate() {
   };
 }
 
+const DUPLICATE_HOMEWORK = {
+  error: {
+    code: 'P0001',
+    hint: 'DUPLICATE',
+    message: 'This homework is already set for this lesson',
+    details: JSON.stringify({ assignment_id: M2.homework, version: 1 }),
+  },
+};
+
 // ------------------------------------------------------------------ homework create
+// M2X: since migration 2310 the same lesson + text again is DUPLICATE with the homework's id, so
+// after an uncertain failure the dialog re-sends the same request instead of searching the list.
 describe('set homework after an uncertain failure (save_homework create has no operation id)', () => {
   beforeEach(() => setCtx(CAPS.teacher, 'teacher', { staff_id: M2.meera }));
-
-  const homeworkItem = (description: string, id = M2.homework) => ({
-    assignment_id: id,
-    section_id: M2.sectionA,
-    section: 'Class 1 A',
-    subject_id: M2.maths,
-    subject: 'Mathematics',
-    assigned_by_staff: M2.meera,
-    assigned_by: 'Meera Rao',
-    lesson_session_id: 501,
-    assigned_on: '2026-10-16',
-    due_on: '2026-10-17',
-    description,
-    status: 'active',
-    version: 1,
-    eligible: 3,
-    checked: 0,
-    completed: 0,
-    not_completed: 0,
-    correction_required: 0,
-    can_edit: true,
-    can_check: true,
-  });
 
   const open = (handler: (fn: string) => unknown) => {
     onRpc((fn) => {
       const base = baseReads(fn);
       if (base) return base;
       if (fn === 'get_diary_entry') return { data: diaryEntryRow(null) };
+      if (fn === 'list_homework') return { data: { items: [], next_cursor: null } };
       return (handler(fn) ?? { data: null }) as never;
     });
     renderAt('/lessons/501', [{ path: '/lessons/:lessonId', element: <LessonPage /> }]);
@@ -185,140 +175,114 @@ describe('set homework after an uncertain failure (save_homework create has no o
     return dialog;
   };
 
-  it('NETWORK, then the homework is found in the lesson: "checking…", then treated as saved and closed', async () => {
+  it('NETWORK, then the re-sent request is DUPLICATE: "checking…", then treated as saved and closed', async () => {
     const user = userEvent.setup();
-    const reads = gate();
-    let created = false;
+    const replies = gate();
+    let attempt = 0;
     open((fn) => {
-      if (fn === 'save_homework') {
-        created = true; // the server made it, but the reply was lost
-        reads.holding = true;
+      if (fn !== 'save_homework') return null;
+      attempt += 1;
+      if (attempt === 1) {
+        replies.holding = true; // the server made it, but the reply was lost
         return NETWORK_ERROR;
       }
-      if (fn === 'list_homework') {
-        const items = created ? [homeworkItem('Exercise 4, page 12')] : [];
-        return reads.hold({ data: { items, next_cursor: null } });
-      }
-      return null;
+      return replies.hold(DUPLICATE_HOMEWORK);
     });
     await screen.findByText('No homework set in this lesson');
     const dialog = await setHomework(user, '  Exercise 4, page 12 ');
 
     expect(await within(dialog).findByText('Not confirmed — checking…')).toBeInTheDocument();
-    // the teacher can't just press Save again while we don't know
+    // the teacher can't change or re-send anything while we don't know
     expect(within(dialog).getByRole('button', { name: 'Set homework' })).toBeDisabled();
-    await waitFor(() => expect(reads.held).toBeGreaterThan(0));
-    act(() => reads.release());
+    await waitFor(() => expect(replies.held).toBeGreaterThan(0));
+    act(() => replies.release());
 
-    expect(await screen.findByText('Homework set.')).toBeInTheDocument();
+    expect((await screen.findAllByText('Homework set.')).length).toBeGreaterThan(0);
     await waitFor(() => expect(dialog).not.toBeInTheDocument());
-    expect(calls('save_homework')).toHaveLength(1);
-    // the look-up read the lesson's day and section
-    expect(calls('list_homework').at(-1)!.args).toMatchObject({
-      p_from: '2026-10-16',
-      p_to: '2026-10-16',
-      p_section_id: M2.sectionA,
-      p_status: 'active',
-    });
+    const sent = calls('save_homework');
+    expect(sent).toHaveLength(2);
+    expect(sent[1]!.args).toEqual(sent[0]!.args); // the same request, trimmed text
+    expect(sent[0]!.args).toMatchObject({ p_lesson_session_id: 501, p_description: 'Exercise 4, page 12' });
   });
 
-  it('NETWORK, then nothing found: "Wasn\'t saved — try again", and only then Save works again', async () => {
+  it('NETWORK, and the first request never arrived: the re-send creates it', async () => {
     const user = userEvent.setup();
-    const reads = gate();
-    let saveFails = true;
+    let attempt = 0;
     open((fn) => {
-      if (fn === 'save_homework') {
-        if (!saveFails) return { data: { assignment_id: M2.homework, version: 1 } };
-        reads.holding = true;
-        return NETWORK_ERROR;
-      }
-      if (fn === 'list_homework') return reads.hold({ data: { items: [], next_cursor: null } });
-      return null;
+      if (fn !== 'save_homework') return null;
+      attempt += 1;
+      return attempt === 1 ? NETWORK_ERROR : { data: { assignment_id: M2.homework, version: 1 } };
     });
     await screen.findByText('No homework set in this lesson');
-    const dialog = await setHomework(user, 'Read chapter 3');
-
-    expect(await within(dialog).findByText('Not confirmed — checking…')).toBeInTheDocument();
-    expect(within(dialog).getByRole('button', { name: 'Set homework' })).toBeDisabled();
-    await waitFor(() => expect(reads.held).toBeGreaterThan(0));
-    act(() => reads.release());
-
-    expect(await within(dialog).findByText("Wasn't saved — try again.")).toBeInTheDocument();
-    const again = within(dialog).getByRole('button', { name: 'Set homework' });
-    expect(again).toBeEnabled();
-    saveFails = false;
-    await user.click(again);
-    // (a toast from an earlier test may still be on screen: look for at least one)
+    await setHomework(user, 'Read chapter 3');
     expect((await screen.findAllByText('Homework set.')).length).toBeGreaterThan(0);
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(calls('save_homework')).toHaveLength(2);
   });
 
-  it('the look-up fails too: still not confirmed, Save stays disabled, "Check again" re-runs it', async () => {
+  it('the re-send fails uncertainly too: still not confirmed, Save stays disabled, "Check again" re-sends', async () => {
     const user = userEvent.setup();
-    let listDown = false;
-    let created = false;
+    let down = true;
     open((fn) => {
-      if (fn === 'save_homework') {
-        listDown = true;
-        created = true;
-        return NETWORK_ERROR;
-      }
-      if (fn === 'list_homework') {
-        if (listDown) return NETWORK_ERROR;
-        return { data: { items: created ? [homeworkItem('Read chapter 3')] : [], next_cursor: null } };
-      }
-      return null;
+      if (fn !== 'save_homework') return null;
+      return down ? NETWORK_ERROR : DUPLICATE_HOMEWORK;
     });
     await screen.findByText('No homework set in this lesson');
     const dialog = await setHomework(user, 'Read chapter 3');
     expect(await within(dialog).findByText(/we couldn.t check whether it was saved/)).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: 'Set homework' })).toBeDisabled();
+    expect(calls('save_homework')).toHaveLength(2);
 
-    listDown = false;
+    down = false;
     await user.click(within(dialog).getByRole('button', { name: 'Check again' }));
-    // (a toast from an earlier test may still be on screen: look for at least one)
     expect((await screen.findAllByText('Homework set.')).length).toBeGreaterThan(0);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(calls('save_homework')).toHaveLength(3);
+  });
+
+  it('DUPLICATE on the first press: "Already set for this lesson", nothing new, dialog closed', async () => {
+    const user = userEvent.setup();
+    open((fn) => (fn === 'save_homework' ? DUPLICATE_HOMEWORK : null));
+    await screen.findByText('No homework set in this lesson');
+    await setHomework(user, 'Read chapter 3');
+    expect(await screen.findByText('Already set for this lesson.')).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(calls('save_homework')).toHaveLength(1);
   });
 
-  it('homework the lesson already had (same text) is not mistaken for the new one', async () => {
+  it('the re-send is refused (the lesson was cancelled meanwhile): the message shows, Save works again', async () => {
     const user = userEvent.setup();
-    const existing = homeworkItem('Read chapter 3', '40404040-0000-4000-8000-0000000000aa');
+    let attempt = 0;
     open((fn) => {
-      if (fn === 'save_homework') return NETWORK_ERROR;
-      if (fn === 'list_homework') return { data: { items: [existing], next_cursor: null } };
-      return null;
+      if (fn !== 'save_homework') return null;
+      attempt += 1;
+      return attempt === 1
+        ? NETWORK_ERROR
+        : { error: { code: 'P0001', hint: 'VALIDATION_ERROR', message: 'Lesson was cancelled' } };
     });
-    await screen.findByTestId('lesson-homework');
+    await screen.findByText('No homework set in this lesson');
     const dialog = await setHomework(user, 'Read chapter 3');
-    expect(await within(dialog).findByText("Wasn't saved — try again.")).toBeInTheDocument();
+    expect(await within(dialog).findByText('Lesson was cancelled')).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Set homework' })).toBeEnabled();
+    expect(within(dialog).queryByTestId('create-check')).not.toBeInTheDocument();
   });
 });
 
 // ------------------------------------------------------------------ copy timetable
-describe('copy a timetable after an uncertain failure (copy_timetable has no operation id)', () => {
+describe('copy a timetable (copy_timetable has no operation id; 2310 DUPLICATE names the draft)', () => {
   const COPY = '7e7e7e7e-0000-4000-8000-0000000000c0';
-  const OLD_DRAFT = '7e7e7e7e-0000-4000-8000-0000000000d0';
-  const versionRow = (id: string, from: string) => ({
-    timetable_version_id: id,
-    status: 'draft',
-    effective_from: from,
-    effective_to: null,
-    period_schedule_id: M2.schedule,
-    period_schedule: 'Regular day',
-    copied_from_id: M2.version,
-    version: 1,
-    updated_at: '2026-10-16T10:00:00+05:30',
-    entry_count: 2,
-    unassigned_teacher_count: 2,
-  });
+  const duplicateDraft = {
+    error: {
+      code: 'P0001',
+      hint: 'DUPLICATE',
+      message: 'This section already has a draft starting on this date. Open it instead.',
+      details: JSON.stringify({ timetable_version_id: COPY }),
+    },
+  };
 
-  /** Class 1 B already has a draft copied from this timetable; `state.copiedOn` adds the new one. */
-  const open = (onCopy: (args: Record<string, unknown>) => unknown) => {
-    const reads = gate();
-    const state = { copiedOn: null as string | null };
+  const open = (onCopy: (args: Record<string, unknown>, attempt: number) => unknown) => {
+    const replies = gate();
+    let attempt = 0;
     onRpc((fn, args) => {
       const base = baseReads(fn);
       if (base) return base;
@@ -334,21 +298,19 @@ describe('copy a timetable after an uncertain failure (copy_timetable has no ope
               : timetableVersionRow({ status: 'active', can_edit: false, conflicts: [] }),
         };
       }
-      if (fn === 'list_timetable_versions') {
-        const rows = [versionRow(OLD_DRAFT, '2026-10-12')];
-        if (state.copiedOn) rows.unshift(versionRow(COPY, state.copiedOn));
-        return reads.hold({ data: rows });
-      }
+      if (fn === 'list_timetable_versions') return { data: [] };
       if (fn === 'copy_timetable') {
-        reads.holding = true;
-        return onCopy(args!) as never;
+        attempt += 1;
+        const reply = onCopy(args!, attempt);
+        // only re-sends are held, so the first reply (NETWORK) arrives at once
+        return (attempt === 1 ? reply : replies.hold(reply)) as never;
       }
       return { data: null };
     });
     const r = renderAt(`/timetable/${M2.version}`, [
       { path: '/timetable/:versionId', element: <TimetableEditorPage /> },
     ]);
-    return { ...r, reads, state };
+    return { ...r, replies };
   };
 
   const startCopy = async (user: ReturnType<typeof userEvent.setup>) => {
@@ -356,51 +318,85 @@ describe('copy a timetable after an uncertain failure (copy_timetable has no ope
     const dialog = await screen.findByRole('dialog');
     await user.click(within(dialog).getByRole('combobox', { name: 'Copy to' }));
     await user.click(await screen.findByRole('option', { name: /1 B/ }));
-    const copy = within(dialog).getByRole('button', { name: 'Copy' });
-    // enabled once the target's current versions are known
-    await waitFor(() => expect(copy).toBeEnabled());
-    await user.click(copy);
+    await user.click(within(dialog).getByRole('button', { name: 'Copy' }));
     return dialog;
   };
 
-  it('NETWORK, then the new draft is in the target section: "checking…", then treated as copied and opened', async () => {
+  it('NETWORK, then the re-sent copy is DUPLICATE: "checking…", then the earlier copy opens', async () => {
     const user = userEvent.setup();
-    const { router, reads, state } = open((args) => {
-      state.copiedOn = args.p_effective_from as string; // made, but the reply was lost
-      return NETWORK_ERROR;
+    const { router, replies } = open((_args, attempt) => {
+      if (attempt === 1) {
+        replies.holding = true; // made, but the reply was lost
+        return NETWORK_ERROR;
+      }
+      return duplicateDraft;
     });
     const dialog = await startCopy(user);
     expect(await within(dialog).findByText('Not confirmed — checking…')).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: 'Copy' })).toBeDisabled();
-    await waitFor(() => expect(reads.held).toBeGreaterThan(0));
-    act(() => reads.release());
+    await waitFor(() => expect(replies.held).toBeGreaterThan(0));
+    act(() => replies.release());
 
     await waitFor(() => expect(router.state.location.pathname).toBe(`/timetable/${COPY}`));
-    expect(calls('copy_timetable')).toHaveLength(1);
-    expect(calls('copy_timetable')[0]!.args).toMatchObject({
-      p_from_version_id: M2.version,
-      p_target_section_id: M2.sectionB,
-    });
-    expect(calls('list_timetable_versions').at(-1)!.args).toMatchObject({ p_section_id: M2.sectionB });
+    const sent = calls('copy_timetable');
+    expect(sent).toHaveLength(2);
+    expect(sent[1]!.args).toEqual(sent[0]!.args);
+    expect(sent[0]!.args).toMatchObject({ p_from_version_id: M2.version, p_target_section_id: M2.sectionB });
   });
 
-  it('NETWORK, then no new draft (the older one does not count): "Wasn\'t saved — try again", then retry', async () => {
+  it('DUPLICATE on the first press: "already has a draft starting on …" + Open it', async () => {
     const user = userEvent.setup();
-    let fail = true;
-    const { reads } = open(() =>
-      fail ? NETWORK_ERROR : { data: { timetable_version_id: COPY, status: 'draft', conflicts: [] } },
-    );
+    const { router } = open(() => duplicateDraft);
     const dialog = await startCopy(user);
-    expect(await within(dialog).findByText('Not confirmed — checking…')).toBeInTheDocument();
-    expect(within(dialog).getByRole('button', { name: 'Copy' })).toBeDisabled();
-    await waitFor(() => expect(reads.held).toBeGreaterThan(0));
-    act(() => reads.release());
+    const notice = await within(dialog).findByTestId('existing-draft');
+    expect(notice).toHaveTextContent(/This section already has a draft starting on /);
+    expect(router.state.location.pathname).toBe(`/timetable/${M2.version}`); // nothing opened by itself
+    await user.click(within(notice).getByRole('button', { name: 'Open it' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/timetable/${COPY}`));
+    expect(calls('copy_timetable')).toHaveLength(1);
+  });
+});
 
-    expect(await within(dialog).findByText("Wasn't saved — try again.")).toBeInTheDocument();
-    const again = within(dialog).getByRole('button', { name: 'Copy' });
-    expect(again).toBeEnabled();
-    fail = false;
-    await user.click(again);
-    await waitFor(() => expect(calls('copy_timetable')).toHaveLength(2));
+// ------------------------------------------------------------------ activate with the version
+describe('activate a draft with its version (2310 activate_timetable p_expected_version)', () => {
+  const open = (onActivate: () => unknown) => {
+    let reads = 0;
+    onRpc((fn) => {
+      const base = baseReads(fn);
+      if (base) return base;
+      if (fn === 'get_timetable_version') {
+        reads += 1;
+        return { data: timetableVersionRow({ conflicts: [], version: reads === 1 ? 3 : 4 }) };
+      }
+      if (fn === 'list_timetable_versions') return { data: [] };
+      if (fn === 'activate_timetable') return onActivate() as never;
+      return { data: null };
+    });
+    return renderAt(`/timetable/${M2.version}`, [
+      { path: '/timetable/:versionId', element: <TimetableEditorPage /> },
+    ]);
+  };
+
+  it('sends the draft version; CONFLICT without a clash list reloads the draft', async () => {
+    const user = userEvent.setup();
+    open(() => ({
+      error: { code: 'P0001', hint: 'CONFLICT', message: 'This draft changed since you opened it' },
+    }));
+    await user.click(await screen.findByRole('button', { name: 'Activate' }));
+    await waitFor(() => expect(calls('activate_timetable')).toHaveLength(1));
+    expect(calls('activate_timetable')[0]!.args).toMatchObject({
+      p_version_id: M2.version,
+      p_expected_version: 3,
+    });
+    expect(await screen.findByText(/Someone else changed this draft/)).toBeInTheDocument();
+    await waitFor(() => expect(calls('get_timetable_version').length).toBeGreaterThanOrEqual(2));
+    expect(screen.queryByText(/double-booked/)).not.toBeInTheDocument();
+  });
+
+  it('replayed: true counts as activated', async () => {
+    const user = userEvent.setup();
+    open(() => ({ data: { timetable_version_id: M2.version, status: 'active', replayed: true } }));
+    await user.click(await screen.findByRole('button', { name: 'Activate' }));
+    expect(await screen.findByText('Timetable activated.')).toBeInTheDocument();
   });
 });

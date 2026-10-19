@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 
 // DTOs for school setup RPCs (migrations 1300, 1800, 1900). Shapes follow the SQL exactly.
 

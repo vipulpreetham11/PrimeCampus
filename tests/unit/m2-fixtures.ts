@@ -306,6 +306,7 @@ export function diaryEntryRow(
 
 export function homeworkRosterRow(overrides: Record<string, unknown> = {}) {
   return {
+    can_check: true,
     assignment: {
       id: M2.homework,
       academic_year_id: ids.year,

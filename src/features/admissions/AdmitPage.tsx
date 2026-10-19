@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 import { toast } from 'sonner';
 import { X } from 'lucide-react';
 import { DataState } from '@/components/shared/DataState';

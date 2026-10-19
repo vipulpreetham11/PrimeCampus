@@ -254,7 +254,7 @@ function LessonHomework({ lesson, canSet }: { lesson: DiaryEntry['lesson']; canS
                 <HomeworkProgress h={h} />
                 <div className="mt-2 flex flex-wrap gap-2">
                   <Button asChild size="sm" className="min-h-11 sm:min-h-8">
-                    <Link to={`/homework/${h.assignment_id}`} state={{ canCheck: h.can_check }}>
+                    <Link to={`/homework/${h.assignment_id}`}>
                       {h.can_check ? 'Check homework' : 'See checks'}
                     </Link>
                   </Button>
@@ -284,8 +284,6 @@ function LessonHomework({ lesson, canSet }: { lesson: DiaryEntry['lesson']; canS
           lesson={{
             lesson_session_id: lesson.lesson_session_id,
             date: lesson.date,
-            section_id: lesson.section_id,
-            existingIds: items.map((h) => h.assignment_id),
           }}
           title={`Set homework — ${lesson.subject}, ${lesson.section}`}
           onClose={() => setCreating(false)}

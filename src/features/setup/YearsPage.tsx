@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataState } from '@/components/shared/DataState';
@@ -64,7 +64,7 @@ function YearDialog({
       toast.success(year ? 'Academic year updated.' : 'Academic year created.');
       onOpenChange(false);
     } catch (e) {
-      setError(handleSaveError(e, { reload: onReload }));
+      setError(handleSaveError(e, { reload: onReload, form }));
     }
   });
   return (

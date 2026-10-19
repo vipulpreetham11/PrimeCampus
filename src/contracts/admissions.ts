@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 
 // DTOs for admissions (1200, 1800, 1900).
 

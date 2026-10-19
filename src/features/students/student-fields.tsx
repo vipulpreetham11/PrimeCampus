@@ -1,5 +1,5 @@
 import type { Control, FieldValues, Path } from 'react-hook-form';
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 import { CheckboxField, DateField, SelectField, TextField } from '@/components/shared/form-fields';
 import { BLOOD_GROUPS, type StudentCore } from '@/contracts/students';
 import { compareIsoDates } from '@/lib/dates';

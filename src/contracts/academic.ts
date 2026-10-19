@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 
 // DTOs for diary and homework RPCs (migrations 1000, 2200). Shapes follow the SQL exactly.
 
@@ -122,6 +122,8 @@ export const homeworkPageSchema = z.object({
 export type HomeworkPage = z.infer<typeof homeworkPageSchema>;
 
 export const homeworkRosterSchema = z.object({
+  /** 2310: this person may record checks now (active homework, teacher of it / academic.correct) */
+  can_check: z.boolean(),
   /** the homework_assignments row as JSON (minus school_id) */
   assignment: z.object({
     id,

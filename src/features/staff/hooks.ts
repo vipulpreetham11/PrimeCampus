@@ -59,11 +59,14 @@ export function useSaveStaffGroup() {
       name: string;
       status: 'active' | 'retired';
       default_salary_paise: number | null;
+      /** Remove the group's default salary (2310 p_clear_default_salary; needs staff_finance.manage). */
+      clear_default_salary?: boolean;
     }) =>
       saveStaffGroup({
         p_name: v.name,
         p_status: v.status,
         ...(v.default_salary_paise !== null ? { p_default_salary_paise: v.default_salary_paise } : {}),
+        ...(v.clear_default_salary ? { p_clear_default_salary: true } : {}),
         ...(v.id ? { p_id: v.id, p_expected_version: v.version } : {}),
       }),
     onSettled: () =>

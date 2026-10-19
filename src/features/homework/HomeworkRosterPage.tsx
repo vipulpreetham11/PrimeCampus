@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Link, useLocation, useParams } from 'react-router';
+import { Link, useParams } from 'react-router';
 import { ArrowLeft, Info } from 'lucide-react';
 import { DataState } from '@/components/shared/DataState';
 import { DateInput } from '@/components/shared/DateInput';
@@ -35,7 +35,6 @@ import {
   shownValue,
   type RosterRow,
 } from '@/lib/roster';
-import { useCanAny } from '@/lib/scope';
 import { useRosterSave, useServerRoster } from '@/lib/use-roster-save';
 import { sendHomeworkChecks, useHomeworkRoster, useInvalidateHomeworkChecks, type CheckValue } from './hooks';
 
@@ -120,15 +119,10 @@ export function HomeworkRosterPage() {
 }
 
 function CheckRoster({ data, reload }: { data: HomeworkRoster; reload: () => Promise<unknown> }) {
-  const location = useLocation();
-  const listSaysCanCheck = (location.state as { canCheck?: boolean } | null)?.canCheck;
-  // get_homework_roster has no can_check flag: the list's flag when we came from it, else the
-  // capabilities that can check homework. The server still decides (FORBIDDEN is shown).
-  const capsCanCheck = useCanAny('academic.correct', 'lessons.teach');
-  const canCheck = listSaysCanCheck ?? capsCanCheck;
   const hw = data.assignment;
   const today = schoolToday();
-  const readOnly = !canCheck || hw.status !== 'active';
+  // the server's own answer (2310): false for a cancelled homework and for read-only roles
+  const readOnly = !data.can_check;
   const snapshot = useSetupSnapshot(hw.academic_year_id);
   const sectionNames = useSectionNames(hw.academic_year_id);
   const subject = snapshot.data?.subjects.find((s) => s.id === hw.subject_id)?.name ?? 'Homework';

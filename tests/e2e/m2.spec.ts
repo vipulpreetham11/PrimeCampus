@@ -7,16 +7,17 @@ import { ApiSession, operatorSession, setKnownPassword } from './helpers/api';
 // and makes the direct FORBIDDEN calls. Passwords exist only in memory and are never printed.
 //
 // Dates are computed from the school's "today" (Asia/Kolkata):
-//   PAST  = the latest student working day on or before today (attendance can't be future-dated)
+//   PAST  = the latest DAY-WISE student working day on or before today (attendance can't be
+//           future-dated; since M2X, Demo School is period-wise on 19 Oct 2026 — see the M2X report)
 //   START = the Monday of PAST's week — the date each run's Class 1 A timetable starts
 //   FUT   = the first working day after today (the timetable change of test 6 starts there)
 // Class 1 A's plan is the same in every run: every weekday Period 1 Mathematics (Meera Rao) and
 // Period 2 English (Ravi Kumar). Class 1 B's active timetable (created once) has Meera Rao in
 // Monday Period 3 — the deliberate clash of test 1.
 //
-// Attendance mode: Demo School has no mode row, so every date is day-wise. Period marking (test 2,
-// and "the substitute marks it" in test 4) needs a period-mode date on or before today; those
-// steps are skipped with a reason when there is none (see the M2 report).
+// Attendance mode: M2X set Demo School to period-wise on 19 Oct 2026 and back to day-wise from
+// 20 Oct (m2x-m2.spec.ts). Period marking (test 2) uses the latest period-wise working day on or
+// before today; it is skipped with a reason when there is none.
 
 const OPERATOR = process.env.E2E_OPERATOR_USERNAME ?? '';
 const OPERATOR_PASSWORD = process.env.E2E_OPERATOR_PASSWORD ?? '';
@@ -85,9 +86,8 @@ test.beforeAll(async () => {
     p_to: addDays(TODAY, 14),
   });
   const working = cal.resolved.filter((d) => d.weight > 0).map((d) => d.date);
-  D.past = working.filter((d) => d <= TODAY).at(-1)!;
+  // (D.past is set below, once the attendance modes are known)
   D.fut = working.find((d) => d > TODAY)!;
-  D.start = addDays(D.past, 1 - isoWeekday(D.past));
   // a period-mode working day on or before today, if the school has one
   const snap = await op.school<{ attendance_modes: { mode: string; effective_from: string }[] }>(
     'get_setup_snapshot',
@@ -98,7 +98,8 @@ test.beforeAll(async () => {
       .sort((a, b) => a.effective_from.localeCompare(b.effective_from))
       .at(-1)?.mode ?? 'daily';
   D.periodDate = working.filter((d) => d <= TODAY && modeOn(d) === 'period').at(-1) ?? null;
-  if (modeOn(D.past) !== 'daily') throw new Error(`test 3 needs a day-wise date; ${D.past} is not`);
+  D.past = working.filter((d) => d <= TODAY && modeOn(d) === 'daily').at(-1)!;
+  D.start = addDays(D.past, 1 - isoWeekday(D.past));
 
   const sections = await op.school<{
     sections: { id: string; class_id: string; name: string }[];
@@ -321,16 +322,25 @@ test('2. Teacher "Today": period attendance (mark all present + 2 exceptions); a
   const fill = page.getByRole('button', { name: /^(Mark (all|remaining \d+) present|Everyone is marked)$/ });
   if (await fill.isEnabled()) await fill.click();
   const rows = page.getByTestId('roster-row');
-  await rows.nth(0).getByRole('radio', { name: 'Absent' }).click();
-  await rows.nth(1).getByRole('radio', { name: 'Late' }).click();
+  // two exceptions that alternate every run (Absent / Late), so each run really saves something
+  const absentNow =
+    (await rows.nth(0).getByRole('radio', { name: 'Absent' }).getAttribute('aria-checked')) === 'true';
+  const aMark = absentNow ? 'Late' : 'Absent';
+  await rows.nth(0).getByRole('radio', { name: aMark }).click();
+  await rows
+    .nth(1)
+    .getByRole('radio', { name: absentNow ? 'Absent' : 'Late' })
+    .click();
   await page.getByRole('button', { name: /Save attendance/ }).click();
-  await expect(page.getByText(/^Saved/)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('roster-save-bar').getByText('Saved.', { exact: true })).toBeVisible({
+    timeout: 30_000,
+  });
 
   // tab B still shows the old roster: changing the first student conflicts
   const firstB = tabB.getByTestId('roster-row').nth(0);
   await firstB.getByRole('radio', { name: 'Present' }).click();
   await tabB.getByRole('button', { name: /Save attendance/ }).click();
-  await expect(firstB.getByTestId('row-conflict')).toContainText('Someone else saved Absent');
+  await expect(firstB.getByTestId('row-conflict')).toContainText(`Someone else saved ${aMark}`);
   await firstB.getByRole('button', { name: /Keep theirs/ }).click();
   await expect(firstB).toHaveAttribute('data-state', 'marked');
   await context.close();
@@ -581,10 +591,9 @@ test("7. Parent sees the child's week timetable, attendance, diary note and home
     'Aarav Sharma',
   );
   const home = page.getByTestId('child-home');
-  // Aarav (like every demo student admitted in M1) joined on 18 Oct 2026, a Sunday: no school day
-  // with him enrolled has happened yet, so attendance and diary are correctly empty (not "0%").
-  await expect(home.getByText('No attendance was expected yet this year.')).toBeVisible({ timeout: 30_000 });
-  await expect(home.getByText('No diary notes in this period')).toBeVisible();
+  // Aarav joined on 18 Oct 2026; his real attendance, diary note and checked homework of a school
+  // day are verified in m2x-m2.spec.ts. Here: the home page has loaded.
+  await expect(home).toBeVisible({ timeout: 30_000 });
   // homework set in test 6 on FUT's lesson: shown as "Not checked yet" (never "not completed")
   const hw = home.getByTestId('child-homework').filter({ hasText: `Bring the reading log — ${RUN}` });
   await expect(hw).toBeVisible();
@@ -601,7 +610,7 @@ test("7. Parent sees the child's week timetable, attendance, diary note and home
   await expect(week).toContainText('Mathematics');
   await expect(week).toContainText('English');
   await page.goto('/child/attendance');
-  await expect(page.getByText('No attendance was expected yet this year.')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('heading', { name: 'Attendance' })).toBeVisible({ timeout: 30_000 });
 
   // the other child's data: no route takes a child id, staff routes are closed, the server refuses
   await page.goto(`/students/${ids.anaya}`);

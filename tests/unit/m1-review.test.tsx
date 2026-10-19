@@ -207,7 +207,7 @@ describe('staff group default salary', () => {
     default_monthly_salary_paise: salary,
   });
 
-  it('an existing default cannot be emptied (the server cannot clear it)', async () => {
+  it('emptying the amount is not a removal (M2X: removal is the explicit "Clear default salary")', async () => {
     setContext(['setup.manage', 'staff_finance.read', 'staff_finance.manage']);
     onRpc((fn) => ({ data: fn === 'list_staff_groups' ? [group(3000000)] : null }));
     renderPage(<StaffGroupsPage />);
@@ -216,7 +216,9 @@ describe('staff group default salary', () => {
     );
     await userEvent.clear(screen.getByLabelText('Default monthly salary'));
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
-    expect(await screen.findByText('To change it, enter a new amount.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Enter an amount, or use “Clear default salary” to remove it.'),
+    ).toBeInTheDocument();
     expect(calls('save_staff_group')).toHaveLength(0);
   });
 
@@ -375,6 +377,49 @@ describe('staff-group weekly pattern saves only the changed weekdays (item 6)', 
       p_staff_group_id: GROUP,
       p_patterns: [{ weekday: 6, day_type: 'weekly_off', period_schedule_id: null }],
     });
+  });
+
+  it('M2X: with no pattern saved at all (group nor default), the suggested week is "Not set yet" and is saved in full', async () => {
+    setContext(['setup.manage', 'staff.member']);
+    onRpc((fn) => ({ data: fn === 'save_calendar_pattern' ? { count: 7 } : null }));
+    const calendar = calendarSchema.parse({
+      academic_year: { id: ids.year, name: '2026-27', start_date: '2026-04-01', end_date: '2027-03-31' },
+      audience: 'staff',
+      staff_group_id: GROUP,
+      patterns: [],
+      overrides: [],
+      resolved: [],
+      totals: { working_days: 0, half_days: 0, holidays: 0, weekly_offs: 0, working_weight: 0 },
+    });
+    renderPage(
+      <PatternDialog
+        calendar={calendar}
+        snapshot={setupSnapshotSchema.parse(snapshot())}
+        yearId={ids.year}
+        audience="staff"
+        staffGroupId={GROUP}
+        open
+        onOpenChange={() => undefined}
+      />,
+    );
+    // the server treats these days as weekly offs until saved: not "School default"
+    expect(screen.queryByText('School default')).not.toBeInTheDocument();
+    expect(screen.getAllByText('Not set yet')).toHaveLength(7);
+    await userEvent.click(screen.getByRole('button', { name: 'Save pattern' }));
+    await waitFor(() => expect(calls('save_calendar_pattern')).toHaveLength(1));
+    const sent = calls('save_calendar_pattern')[0]!.args!.p_patterns as {
+      weekday: number;
+      day_type: string;
+    }[];
+    expect(sent.map((r) => [r.weekday, r.day_type])).toEqual([
+      [1, 'working'],
+      [2, 'working'],
+      [3, 'working'],
+      [4, 'working'],
+      [5, 'working'],
+      [6, 'working'],
+      [7, 'weekly_off'],
+    ]);
   });
 });
 

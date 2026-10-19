@@ -472,9 +472,9 @@ describe('homework checking roster', () => {
     });
   });
 
-  it('a principal-like role without checking rights sees the checks read-only', async () => {
+  it('the server says can_check: false (e.g. a principal): the checks are read-only', async () => {
     setCtx(CAPS.principal, 'principal');
-    open((fn) => (fn === 'get_homework_roster' ? { data: homeworkRosterRow() } : null));
+    open((fn) => (fn === 'get_homework_roster' ? { data: homeworkRosterRow({ can_check: false }) } : null));
     await screen.findByTestId('homework-roster');
     expect(screen.getByText('You can see the checks but not change them.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Save checks/ })).not.toBeInTheDocument();

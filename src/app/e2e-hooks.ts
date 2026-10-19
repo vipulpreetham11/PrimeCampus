@@ -12,6 +12,7 @@ declare global {
       forceStaleRevision: () => void;
       probeSchoolRpc: () => Promise<string>;
       cachedQueryKeys: () => unknown[][];
+      cachedQueries: () => { key: unknown[]; hasData: boolean; status: string }[];
     };
   }
 }
@@ -34,5 +35,11 @@ export function installE2EHooks(): void {
         .getQueryCache()
         .getAll()
         .map((q) => [...q.queryKey]),
+    // A query that is cached but holds no data (e.g. refused with STALE_CONTEXT) is not leftover data.
+    cachedQueries: () =>
+      queryClient
+        .getQueryCache()
+        .getAll()
+        .map((q) => ({ key: [...q.queryKey], hasData: q.state.data !== undefined, status: q.state.status })),
   };
 }

@@ -21,11 +21,10 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { TimetableVersionRow } from '@/contracts/timetable';
 import { useSetupSnapshot } from '@/features/setup/hooks';
-import { isUncertainFailure, useCreateCheck } from '@/lib/create-check';
 import { formatDate, maxDate, schoolToday } from '@/lib/dates';
-import { toAppError, type AppError } from '@/lib/errors';
 import { useCan } from '@/lib/scope';
-import { findCopiedDraft, useCopyTimetable, useSaveTimetableDraft, useTimetableVersions } from './hooks';
+import { ExistingDraftNotice, useDraftCreate } from './draft-create';
+import { useCopyTimetable, useSaveTimetableDraft, useTimetableVersions } from './hooks';
 import { SectionSelect, useSectionOptions } from './pickers';
 
 // Timetable versions of a section (brief §1): draft / active / retired with their dates. Admin can
@@ -161,19 +160,18 @@ function NewDraftDialog({
   const [start, setStart] = useState<string>(year ? maxDate(schoolToday(), year.start_date) : schoolToday());
   const [mode, setMode] = useState<'copy' | 'blank'>(source ? 'copy' : 'blank');
   const [scheduleId, setScheduleId] = useState<string | null>(schedules[0]?.id ?? null);
-  const [error, setError] = useState<AppError | null>(null);
   const save = useSaveTimetableDraft();
   const copy = useCopyTimetable();
-  const check = useCreateCheck();
+  const create = useDraftCreate();
+  const { check } = create;
   const busy = save.isPending || copy.isPending;
 
+  const open = (id: string) => navigate(`/timetable/${id}`);
+  const opened = (id: string) => {
+    toast.success('Draft created.');
+    open(id);
+  };
   const submit = () => {
-    setError(null);
-    check.reset();
-    const opened = (id: string) => {
-      toast.success('Draft created.');
-      navigate(`/timetable/${id}`);
-    };
     if (mode === 'copy' && source) {
       const request = {
         fromVersionId: source.timetable_version_id,
@@ -181,29 +179,26 @@ function NewDraftDialog({
         effectiveFrom: start,
         keepTeachers: true,
       };
-      const knownIds = versions.map((v) => v.timetable_version_id);
-      copy.mutate(request, {
-        onSuccess: (r) => opened(r.timetable_version_id),
-        onError: (e) => {
-          // copy_timetable has no operation id: look for the draft before allowing another copy
-          if (!isUncertainFailure(e)) return setError(toAppError(e));
-          check.verify(
-            () => findCopiedDraft({ ...request, knownIds }),
-            (draft) => opened(draft.timetable_version_id),
-          );
-        },
-      });
+      create.run(
+        () => copy.mutateAsync(request),
+        start,
+        (r) => opened(r.timetable_version_id),
+        opened,
+      );
     } else if (scheduleId) {
-      save.mutate(
-        {
-          sectionId,
-          periodScheduleId: scheduleId,
-          effectiveFrom: start,
-          entries: [],
-          versionId: null,
-          expectedVersion: null,
-        },
-        { onSuccess: (r) => opened(r.timetable_version_id), onError: (e) => setError(toAppError(e)) },
+      const draft = {
+        sectionId,
+        periodScheduleId: scheduleId,
+        effectiveFrom: start,
+        entries: [],
+        versionId: null,
+        expectedVersion: null,
+      };
+      create.run(
+        () => save.mutateAsync(draft),
+        start,
+        (r) => opened(r.timetable_version_id),
+        opened,
       );
     }
   };
@@ -269,7 +264,8 @@ function NewDraftDialog({
               )}
             </div>
           )}
-          <ErrorText error={error} />
+          <ErrorText error={create.error} />
+          <ExistingDraftNotice existing={create.existing} onOpen={open} />
           <CreateCheckNotice check={check} />
         </div>
         <DialogFooter>

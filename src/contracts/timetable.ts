@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 import { ATTENDANCE_MODES, SLOT_KINDS } from './setup';
 
 // DTOs for timetable and lesson RPCs (migrations 1000, 1300, 2200). Shapes follow the SQL exactly.
@@ -94,10 +94,12 @@ export const timetableDraftSavedSchema = z.object({
 export type TimetableDraftSaved = z.infer<typeof timetableDraftSavedSchema>;
 
 export const timetableDiscardedSchema = z.object({ timetable_version_id: id, discarded: z.boolean() });
+// A repeat (2310) returns { timetable_version_id, status: 'active', replayed: true } without next_step.
 export const timetableActivatedSchema = z.object({
   timetable_version_id: id,
   status: z.literal('active'),
-  next_step: z.string(),
+  next_step: z.string().optional(),
+  replayed: z.literal(true).optional(),
 });
 export const timetableCopiedSchema = z.object({
   timetable_version_id: id,
@@ -252,7 +254,18 @@ export const teacherTodaySchema = z.object({
     z.object({ section_id: id, section: z.string(), daily_marked: count, eligible: count }),
   ),
   homework_to_check: z.array(
-    z.object({ assignment_id: id, section_id: id, due_on: isoDate, checked: count }),
+    z.object({
+      assignment_id: id,
+      section_id: id,
+      // 2310: names and the eligible count come with the item
+      section: z.string(),
+      subject_id: id,
+      subject: z.string(),
+      assigned_on: isoDate,
+      due_on: isoDate,
+      eligible: count,
+      checked: count,
+    }),
   ),
 });
 export type TeacherToday = z.infer<typeof teacherTodaySchema>;

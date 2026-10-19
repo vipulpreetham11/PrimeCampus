@@ -1,4 +1,4 @@
-import type { z } from 'zod';
+import type { z } from '@/lib/zod';
 import type { Database } from '@/generated/database.types';
 import { RPC_RESULT_SCHEMAS, type RpcWithSchema } from '@/contracts/rpc-results';
 import { AppError, newRequestId, reportGlobalError, toAppError } from '@/lib/errors';

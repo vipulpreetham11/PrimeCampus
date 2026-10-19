@@ -13,6 +13,9 @@ export const queryClient = new QueryClient({
       refetchOnWindowFocus: true,
       networkMode: 'online',
     },
-    mutations: { retry: false, networkMode: 'online' },
+    // 'always': an offline save fails at once as NETWORK ("You appear to be offline… Nothing was
+    // changed") and the user decides to retry. With 'online' it was paused silently ("Saving…") and
+    // sent later on its own (found in M2X).
+    mutations: { retry: false, networkMode: 'always' },
   },
 });

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 import { toast } from 'sonner';
 import { DataState } from '@/components/shared/DataState';
 import { ErrorText } from '@/components/shared/ErrorText';
@@ -75,7 +75,7 @@ function SalaryForm({ staffId }: { staffId: string }) {
             toast.success('Salary rate saved.');
             form.reset({ monthly_salary_paise: null, effective_from: schoolToday(), reason: '' });
           } catch (e) {
-            setError(handleSaveError(e));
+            setError(handleSaveError(e, { form, fields: { monthly_salary: 'monthly_salary_paise' } }));
           }
         })}
       >
@@ -120,7 +120,7 @@ function BankForm({ staffId, current }: { staffId: string; current: StaffConfide
             toast.success('Bank details saved.');
             form.resetField('account_number', { defaultValue: '' });
           } catch (e) {
-            setError(handleSaveError(e));
+            setError(handleSaveError(e, { form }));
           }
         })}
       >

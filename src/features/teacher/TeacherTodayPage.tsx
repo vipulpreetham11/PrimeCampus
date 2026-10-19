@@ -7,8 +7,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type { TeacherToday, TodayLesson } from '@/contracts/timetable';
-import { useSectionNames } from '@/features/timetable/pickers';
-import { addDays, formatDate, formatDateLong, formatTime, isIsoDate, schoolToday } from '@/lib/dates';
+import { addDays, formatDateLong, formatDayMonth, formatTime, isIsoDate, schoolToday } from '@/lib/dates';
 import { getTeacherToday } from '@/lib/rpc';
 import { useScopedKey } from '@/lib/scope';
 import { cn } from '@/lib/utils';
@@ -73,7 +72,6 @@ export function TeacherTodayPage() {
 }
 
 function TodayView({ t }: { t: TeacherToday }) {
-  const sectionNames = useSectionNames();
   const daily = t.mode === 'daily';
   return (
     <div className="space-y-6">
@@ -135,16 +133,14 @@ function TodayView({ t }: { t: TeacherToday }) {
           <ul className="space-y-2">
             {t.homework_to_check.map((h) => (
               <li key={h.assignment_id} className="flex flex-wrap items-center gap-3 rounded-lg border p-3">
-                <div className="min-w-0 flex-1 text-sm">
-                  <p className="font-medium">{sectionNames.get(h.section_id) ?? 'Section'}</p>
-                  <p className="text-muted-foreground">
-                    Due {formatDate(h.due_on)} · {h.checked} checked so far
-                  </p>
-                </div>
+                <p className="min-w-0 flex-1 text-sm" data-testid="homework-to-check">
+                  <span className="font-medium">
+                    {h.subject} · {h.section}
+                  </span>{' '}
+                  — {h.checked} of {h.eligible} checked, due {formatDayMonth(h.due_on)}
+                </p>
                 <Button asChild variant="outline" className="min-h-11">
-                  <Link to={`/homework/${h.assignment_id}`} state={{ canCheck: true }}>
-                    Check
-                  </Link>
+                  <Link to={`/homework/${h.assignment_id}`}>Check</Link>
                 </Button>
               </li>
             ))}

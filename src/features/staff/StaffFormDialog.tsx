@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 import { toast } from 'sonner';
 import { ErrorText } from '@/components/shared/ErrorText';
 import { CheckboxField, DateField, SelectField, TextField } from '@/components/shared/form-fields';
@@ -128,7 +128,7 @@ export function StaffFormDialog({
       onOpenChange(false);
       onSaved?.(res.staff_id);
     } catch (e) {
-      setError(handleSaveError(e, { reload: onReload }));
+      setError(handleSaveError(e, { reload: onReload, form }));
     }
   });
 

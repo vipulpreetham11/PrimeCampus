@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 import { toast } from 'sonner';
 import { DataState } from '@/components/shared/DataState';
 import { ErrorText } from '@/components/shared/ErrorText';
@@ -108,7 +108,7 @@ export function AttendanceModePage() {
                     await save.mutateAsync(v);
                     toast.success(`${MODE_TEXT[v.mode].label} from ${formatDate(v.effective_from)}.`);
                   } catch (e) {
-                    setError(handleSaveError(e));
+                    setError(handleSaveError(e, { form }));
                   }
                 })}
               >

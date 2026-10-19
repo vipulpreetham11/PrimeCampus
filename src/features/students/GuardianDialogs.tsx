@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 import { toast } from 'sonner';
 import { DataState } from '@/components/shared/DataState';
 import { ErrorText } from '@/components/shared/ErrorText';
@@ -101,7 +101,7 @@ function GuardianEditForm({
             }
             onDone();
           } catch (e) {
-            setError(handleSaveError(e, { reload: onReload }));
+            setError(handleSaveError(e, { reload: onReload, form }));
           }
         })}
       >
@@ -327,7 +327,7 @@ export function AddGuardianDialog({
       }
       onOpenChange(false);
     } catch (e) {
-      setError(handleSaveError(e));
+      setError(handleSaveError(e, { form }));
     }
   };
 

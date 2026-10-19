@@ -24,7 +24,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import type { TimetableConflict, TimetableDraftSaved, TimetableVersion } from '@/contracts/timetable';
 import { useClassSubjects, useSetupSnapshot } from '@/features/setup/hooks';
-import { isUncertainFailure, useCreateCheck } from '@/lib/create-check';
 import { formatTime, maxDate, schoolToday, weekdayLong, weekdayShort } from '@/lib/dates';
 import { AppError, routeId, toAppError } from '@/lib/errors';
 import { isConflict } from '@/lib/save-feedback';
@@ -41,14 +40,13 @@ import {
   type Cell,
   type Grid,
 } from './grid-model';
+import { ExistingDraftNotice, useDraftCreate } from './draft-create';
 import {
-  findCopiedDraft,
   useActivateTimetable,
   useCopyTimetable,
   useDiscardDraft,
   useSaveTimetableDraft,
   useTimetableVersion,
-  useTimetableVersions,
 } from './hooks';
 import { GenerateLessonsForm } from './LessonsGenerate';
 import { SectionSelect, useSectionNames, useSectionOptions, useTeacherOptions } from './pickers';
@@ -216,28 +214,40 @@ function Editor({
 
   const onActivate = () => {
     setError(null);
-    activate.mutate(version.timetable_version_id, {
-      onSuccess: () => {
-        toast.success('Timetable activated.');
-        onActivated();
+    activate.mutate(
+      { versionId: version.timetable_version_id, version: version.version },
+      {
+        // replayed: true (2310) = it was already activated, e.g. by a first press whose reply was lost
+        onSuccess: () => {
+          toast.success('Timetable activated.');
+          onActivated();
+        },
+        onError: (e) => onActivateError(e),
       },
-      onError: (e) => {
-        const err = toAppError(e);
-        // CONFLICT here = a teacher is double-booked (the clashes are reloaded into the grid)
-        if (isConflict(err)) {
-          setError(
-            new AppError(
-              'CONFLICT',
-              'A teacher is double-booked in this timetable. Fix the clashes shown in the grid first.',
-              err.requestId,
-            ),
-          );
-          void refetch();
-          return;
-        }
-        setError(err);
-      },
-    });
+    );
+  };
+
+  const onActivateError = (e: unknown) => {
+    const err = toAppError(e);
+    // CONFLICT without a clash list = the draft changed since it was opened (2310 expected version)
+    if (isConflict(err) && !Array.isArray(err.details)) {
+      toast.warning('Someone else changed this draft. It has been reloaded — check it, then activate again.');
+      void refetch();
+      return;
+    }
+    // CONFLICT with a clash list = a teacher is double-booked (the clashes are reloaded into the grid)
+    if (isConflict(err)) {
+      setError(
+        new AppError(
+          'CONFLICT',
+          'A teacher is double-booked in this timetable. Fix the clashes shown in the grid first.',
+          err.requestId,
+        ),
+      );
+      void refetch();
+      return;
+    }
+    setError(err);
   };
 
   const onDiscard = () => {
@@ -761,26 +771,23 @@ function CopyDialog({
   const [target, setTarget] = useState<string | null>(null);
   const [start, setStart] = useState<string>(maxDate(version.effective_from, schoolToday()));
   const [keepTeachers, setKeepTeachers] = useState(false);
-  const [error, setError] = useState<AppError | null>(null);
   const copy = useCopyTimetable();
-  const check = useCreateCheck();
-  // the target's versions before the copy: after an uncertain failure, a new draft among them is ours
-  const targetVersions = useTimetableVersions(target);
+  const create = useDraftCreate();
+  const { check } = create;
   const outOfYear = !!year && (start < year.start_date || start > year.end_date);
 
   const submit = () => {
-    if (!target || !targetVersions.data) return;
-    setError(null);
-    check.reset();
+    if (!target) return;
     const request = {
       fromVersionId: version.timetable_version_id,
       targetSectionId: target,
       effectiveFrom: start,
       keepTeachers,
     };
-    const knownIds = targetVersions.data.map((v) => v.timetable_version_id);
-    copy.mutate(request, {
-      onSuccess: (r) => {
+    create.run(
+      () => copy.mutateAsync(request),
+      start,
+      (r) => {
         toast.success(
           r.conflicts.length > 0
             ? `Draft created with ${r.conflicts.length} teacher clashes to fix.`
@@ -788,18 +795,11 @@ function CopyDialog({
         );
         onCopied(r.timetable_version_id);
       },
-      onError: (e) => {
-        // copy_timetable has no operation id: look for the draft before allowing another copy
-        if (!isUncertainFailure(e)) return setError(toAppError(e));
-        check.verify(
-          () => findCopiedDraft({ ...request, knownIds }),
-          (draft) => {
-            toast.success('Draft created. Open it to check for teacher clashes.');
-            onCopied(draft.timetable_version_id);
-          },
-        );
+      (versionId) => {
+        toast.success('Draft created. Open it to check for teacher clashes.');
+        onCopied(versionId);
       },
-    });
+    );
   };
 
   return (
@@ -838,8 +838,8 @@ function CopyDialog({
             <Switch id="copy-keep" checked={keepTeachers} onCheckedChange={setKeepTeachers} />
             <Label htmlFor="copy-keep">Keep the teachers (otherwise every period is Unassigned)</Label>
           </div>
-          {targetVersions.isError && <ErrorText error={targetVersions.error} />}
-          <ErrorText error={error} />
+          <ErrorText error={create.error} />
+          <ExistingDraftNotice existing={create.existing} onOpen={onCopied} />
           <CreateCheckNotice check={check} />
         </div>
         <DialogFooter>
@@ -847,9 +847,7 @@ function CopyDialog({
             Cancel
           </Button>
           <Button
-            disabled={
-              !target || !targetVersions.data || !start || outOfYear || copy.isPending || check.blocksRetry
-            }
+            disabled={!target || !start || outOfYear || copy.isPending || check.blocksRetry}
             onClick={submit}
           >
             Copy

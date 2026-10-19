@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 import { loginRefSchema } from './staff';
 
 // DTOs for students & guardians (1000, 1300, 1800, 1900).

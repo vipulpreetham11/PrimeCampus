@@ -1,7 +1,8 @@
 import { expect, test, type Locator, type Page, type Route } from '@playwright/test';
 
 // 375px roster layout (M2 owner review): name, reference and state on the left, the choice buttons
-// on the RIGHT of the same line, buttons ≥ 44px, ≤ 64px per row, no sideways page scroll.
+// on the RIGHT of the same line, buttons ≥ 44px, ≤ 72px per row (M2X), the admission number readable
+// in full without hover, no sideways page scroll.
 //
 // Runs WITHOUT the live backend: every Supabase request is answered here (a fake Auth session and
 // fixed RPC replies) and anything unexpected is aborted, so nothing reaches the real project. It
@@ -11,7 +12,7 @@ import { expect, test, type Locator, type Page, type Route } from '@playwright/t
 const SHOTS = process.env.M2_LAYOUT_SHOTS === '1';
 const SCREENS = 'docs/reports/m2-screens';
 const PHONE = { width: 375, height: 812 };
-const MAX_ROW = 64;
+const MAX_ROW = 72;
 
 const uuid = (prefix: string, n: number) => `${prefix}-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const ACCOUNT = uuid('11111111', 1);
@@ -52,7 +53,8 @@ const STUDENTS = Array.from({ length: 40 }, (_, i) => ({
     i === 4
       ? 'Venkata Sai Lakshmi Narasimha Rao'
       : `${FIRST[i % FIRST.length]} ${LAST[Math.floor(i / FIRST.length) % LAST.length]}`,
-  admission_no: i === 7 ? 'DEMO/2026-27/ADM/000008' : `DEMO-S${i + 1}`,
+  // live run-suffixed numbers are this long ("DEMO-S…" was all a phone showed before M2X)
+  admission_no: i === 7 ? 'DEMO/2026-27/ADM/000008' : `DEMO-IMP-${String(i + 1).padStart(4, '0')}`,
 }));
 
 const day = { academic_year_id: YEAR, day_type: 'working', weight: 1, period_schedule_id: null, label: null };
@@ -186,6 +188,7 @@ function rpcReply(fn: string): unknown {
       };
     case 'get_homework_roster':
       return {
+        can_check: true,
         assignment: {
           id: HOMEWORK,
           academic_year_id: YEAR,
@@ -281,26 +284,49 @@ async function noHorizontalScroll(page: Page) {
   expect(overflow).toBeLessThanOrEqual(1);
 }
 
-/** Each row: ≤ 64px; the choice buttons sit to the right of the name, on the name's line; ≥ 44px. */
+/**
+ * Each row: ≤ 72px; the choice buttons sit to the right of the name, on the name's line; ≥ 44px; the
+ * reference (admission / employee number) is shown in full — not cut off, not hidden behind a tooltip.
+ */
 async function checkCompactRows(rows: Locator, { maxHeight = MAX_ROW, skip = new Set<number>() } = {}) {
   const n = await rows.count();
   expect(n).toBeGreaterThan(0);
+  const heights: number[] = [];
   for (let i = 0; i < n; i += 1) {
     const row = rows.nth(i);
     const name = row.locator('p').first();
     const group = row.getByRole('radiogroup').first();
     const [r, nb, gb] = await Promise.all([row.boundingBox(), name.boundingBox(), group.boundingBox()]);
     if (!r || !nb || !gb) throw new Error(`row ${i} not laid out`);
-    if (!skip.has(i)) expect(r.height, `row ${i} height`).toBeLessThanOrEqual(maxHeight);
+    if (!skip.has(i)) {
+      heights.push(r.height);
+      expect(r.height, `row ${i} height`).toBeLessThanOrEqual(maxHeight);
+    }
     expect(gb.x, `row ${i}: buttons to the right of the name`).toBeGreaterThanOrEqual(nb.x + nb.width - 1);
     expect(gb.y, `row ${i}: buttons on the name's line`).toBeLessThan(nb.y + nb.height);
     expect(gb.x + gb.width, `row ${i}: buttons inside the row`).toBeLessThanOrEqual(r.x + r.width + 1);
+    const ref = row.getByTestId('row-reference');
+    if ((await ref.count()) > 0) {
+      const cut = await ref.evaluate(
+        (el) => el.scrollWidth > el.clientWidth + 1 || getComputedStyle(el).textOverflow === 'ellipsis',
+      );
+      expect(cut, `row ${i}: reference shown in full`).toBe(false);
+      const refBox = await ref.boundingBox();
+      expect(refBox!.x + refBox!.width, `row ${i}: reference inside the row`).toBeLessThanOrEqual(
+        r.x + r.width + 1,
+      );
+    }
     for (const b of await group.getByRole('radio').all()) {
       const bb = await b.boundingBox();
       expect(bb!.height).toBeGreaterThanOrEqual(44);
       expect(bb!.width).toBeGreaterThanOrEqual(44);
     }
   }
+  // measured heights, for the module report
+  test.info().annotations.push({
+    type: 'row heights',
+    description: `min ${Math.min(...heights)}px, max ${Math.max(...heights)}px over ${heights.length} rows`,
+  });
 }
 
 async function shot(page: Page, name: string) {
@@ -327,12 +353,16 @@ test('375px: student day register rows are compact, buttons on the right', async
   // the state stays in words next to the admission number
   await expect(rows.nth(12).getByText('Not saved')).toBeVisible();
   await expect(rows.nth(0).getByText('Saved', { exact: true })).toBeVisible();
-  await expect(rows.nth(7).getByTestId('row-reference')).toContainText('DEMO/2026-27');
+  await expect(rows.nth(7).getByTestId('row-reference')).toContainText('DEMO/2026-27/ADM/000008');
+  await expect(rows.nth(12).getByTestId('row-reference')).toContainText('DEMO-IMP-0013');
 
-  await checkCompactRows(rows);
+  // row 7 has a 23-character admission number: it needs two lines of its own (known limit, M2X
+  // report); still shown in full, the row may be up to 88px. Every other row stays within 72px.
+  await checkCompactRows(rows, { skip: new Set([7]) });
+  expect((await rows.nth(7).boundingBox())!.height).toBeLessThanOrEqual(88);
   await noHorizontalScroll(page);
   const list = await page.getByTestId('roster-rows').boundingBox();
-  // 40 students in well under 40 × 64px
+  // 40 students in well under 40 × 72px
   expect(list!.height).toBeLessThanOrEqual(40 * MAX_ROW + 40);
   await shot(page, '375-marking-roster');
   expect(unexpected).toEqual([]);

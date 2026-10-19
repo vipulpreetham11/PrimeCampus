@@ -36,6 +36,17 @@ export default tseslint.config(
     },
   },
   {
+    // Zod is configured once in src/lib/zod.ts (jitless: no eval probe under our CSP).
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/lib/zod.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { paths: [{ name: 'zod', message: 'Import z from @/lib/zod (it configures Zod for our CSP).' }] },
+      ],
+    },
+  },
+  {
     // Components never talk to supabase directly (CLAUDE.md repo layout).
     files: ['src/components/**/*.{ts,tsx}', 'src/features/**/*.tsx', 'src/app/**/*.tsx'],
     rules: {
@@ -44,6 +55,7 @@ export default tseslint.config(
         {
           paths: [
             { name: '@/lib/supabase', message: 'Use a hook in src/features/* that calls src/lib/rpc.' },
+            { name: 'zod', message: 'Import z from @/lib/zod (it configures Zod for our CSP).' },
           ],
         },
       ],

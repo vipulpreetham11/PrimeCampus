@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 import { X } from 'lucide-react';
 import { ErrorText } from '@/components/shared/ErrorText';
 import { SelectField, TextField } from '@/components/shared/form-fields';

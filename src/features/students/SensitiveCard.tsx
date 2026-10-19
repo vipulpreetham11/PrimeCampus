@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 import { toast } from 'sonner';
 import { ErrorText } from '@/components/shared/ErrorText';
 import { MoneyText } from '@/components/shared/MoneyText';
@@ -146,7 +146,9 @@ function SensitiveForm({
             toast.success('Sensitive details saved.');
             onDone();
           } catch (e) {
-            setError(handleSaveError(e));
+            setError(
+              handleSaveError(e, { form, fields: { family_annual_income: 'family_annual_income_paise' } }),
+            );
           }
         })}
       >

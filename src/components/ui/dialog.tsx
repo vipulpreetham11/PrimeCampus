@@ -38,10 +38,17 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  onOpenAutoFocus,
+  onCloseAutoFocus,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean;
 }) {
+  // Our dialogs are mostly opened from state, without a DialogTrigger. Radix then has no trigger to
+  // give the focus back to on close, and it lands on <body> (found in the M2X keyboard walkthrough).
+  // Remember what had the focus when the dialog opened — Radix fires onOpenAutoFocus just before it
+  // moves the focus in — and return to it, if it is still on the page.
+  const returnTo = React.useRef<HTMLElement | null>(null);
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
@@ -51,6 +58,18 @@ function DialogContent({
           'bg-background data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 outline-none sm:max-w-lg',
           className,
         )}
+        onOpenAutoFocus={(event) => {
+          returnTo.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+          onOpenAutoFocus?.(event);
+        }}
+        onCloseAutoFocus={(event) => {
+          onCloseAutoFocus?.(event);
+          const el = returnTo.current;
+          returnTo.current = null;
+          if (event.defaultPrevented || !el || !el.isConnected || el === document.body) return;
+          event.preventDefault();
+          el.focus();
+        }}
         {...props}
       >
         {children}

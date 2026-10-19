@@ -43,7 +43,8 @@
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.71.1",
     "vite": "^8.3.2",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.3",
+    "wrangler": "4.149.0"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
@@ -62,5 +63,8 @@
     "sonner": "^2.0.8",
     "tailwind-merge": "^3.7.0",
     "zod": "^4.6.5"
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
   }
 }

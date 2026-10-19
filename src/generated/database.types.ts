@@ -23,7 +23,11 @@ export type Database = {
     }
     Functions: {
       activate_timetable: {
-        Args: { p_ctx_rev: number; p_version_id: string }
+        Args: {
+          p_ctx_rev: number
+          p_expected_version?: number
+          p_version_id: string
+        }
         Returns: Json
       }
       add_invoice_adjustment: {
@@ -71,6 +75,24 @@ export type Database = {
           p_bounced_on: string
           p_cheque_id: string
           p_ctx_rev: number
+          p_reason: string
+        }
+        Returns: Json
+      }
+      cancel_cheque: {
+        Args: {
+          p_cheque_id: string
+          p_ctx_rev: number
+          p_expected_version: number
+          p_reason: string
+        }
+        Returns: Json
+      }
+      cancel_invoice: {
+        Args: {
+          p_ctx_rev: number
+          p_invoice_id: string
+          p_operation_id: string
           p_reason: string
         }
         Returns: Json
@@ -182,9 +204,15 @@ export type Database = {
           p_academic_year_id?: string
           p_class_id?: string
           p_ctx_rev: number
+          p_fee_term_id?: string
           p_only_overdue?: boolean
+          p_only_with_balance?: boolean
           p_section_id?: string
         }
+        Returns: Json
+      }
+      get_fee_setup: {
+        Args: { p_academic_year_id?: string; p_ctx_rev: number }
         Returns: Json
       }
       get_followups_due: {
@@ -319,6 +347,7 @@ export type Database = {
           p_academic_year_id: string
           p_ctx_rev: number
           p_fee_term_id?: string
+          p_operation_id: string
           p_preset_id: string
           p_reason: string
           p_student_id: string
@@ -366,11 +395,38 @@ export type Database = {
         }
         Returns: Json
       }
+      list_cheques: {
+        Args: {
+          p_before_date?: string
+          p_before_id?: string
+          p_ctx_rev: number
+          p_from?: string
+          p_limit?: number
+          p_status?: string
+          p_to?: string
+        }
+        Returns: Json
+      }
       list_class_subjects: {
         Args: {
           p_academic_year_id: string
           p_class_id?: string
           p_ctx_rev: number
+        }
+        Returns: Json
+      }
+      list_collections: {
+        Args: {
+          p_before_date?: string
+          p_before_id?: string
+          p_collected_by?: string
+          p_ctx_rev: number
+          p_from: string
+          p_limit?: number
+          p_method?: string
+          p_receiving_account_id?: string
+          p_search?: string
+          p_to: string
         }
         Returns: Json
       }
@@ -418,6 +474,24 @@ export type Database = {
         }
         Returns: Json
       }
+      list_optional_fee_roster: {
+        Args: {
+          p_academic_year_id: string
+          p_ctx_rev: number
+          p_fee_head_id: string
+          p_section_id?: string
+        }
+        Returns: Json
+      }
+      list_payment_exceptions: {
+        Args: {
+          p_before_id?: string
+          p_ctx_rev: number
+          p_limit?: number
+          p_status?: string
+        }
+        Returns: Json
+      }
       list_school_users: { Args: { p_ctx_rev: number }; Returns: Json }
       list_staff: {
         Args: {
@@ -429,6 +503,17 @@ export type Database = {
       }
       list_staff_groups: {
         Args: { p_ctx_rev: number; p_include_retired?: boolean }
+        Returns: Json
+      }
+      list_student_concessions: {
+        Args: {
+          p_academic_year_id?: string
+          p_after_id?: string
+          p_ctx_rev: number
+          p_include_revoked?: boolean
+          p_limit?: number
+          p_student_id?: string
+        }
         Returns: Json
       }
       list_students: {
@@ -623,6 +708,7 @@ export type Database = {
           p_ctx_rev: number
           p_kind: string
           p_note: string
+          p_operation_id: string
           p_reference?: string
           p_student_id?: string
         }
@@ -631,6 +717,19 @@ export type Database = {
       record_telemetry: { Args: { p_events: Json }; Returns: Json }
       remove_substitute: {
         Args: { p_ctx_rev: number; p_lesson_session_id: number }
+        Returns: Json
+      }
+      resolve_payment_exception: {
+        Args: {
+          p_ctx_rev: number
+          p_expected_version: number
+          p_id: string
+          p_note: string
+        }
+        Returns: Json
+      }
+      retire_late_fee_rule: {
+        Args: { p_academic_year_id: string; p_ctx_rev: number }
         Returns: Json
       }
       reverse_collection: {
@@ -763,6 +862,7 @@ export type Database = {
           p_id?: string
           p_name: string
           p_sort_order: number
+          p_status?: string
         }
         Returns: Json
       }
@@ -881,6 +981,7 @@ export type Database = {
       }
       save_staff_group: {
         Args: {
+          p_clear_default_salary?: boolean
           p_ctx_rev: number
           p_default_salary_paise?: number
           p_expected_version?: number
@@ -973,6 +1074,16 @@ export type Database = {
           p_enabled: boolean
           p_fee_head_id: string
           p_student_id: string
+        }
+        Returns: Json
+      }
+      set_optional_fees: {
+        Args: {
+          p_academic_year_id: string
+          p_changes: Json
+          p_ctx_rev: number
+          p_fee_head_id: string
+          p_operation_id: string
         }
         Returns: Json
       }

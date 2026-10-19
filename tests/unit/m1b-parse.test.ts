@@ -183,6 +183,33 @@ describe('XLSX parsing', () => {
     ]);
   });
 
+  // M2X §0: exceljs runs with the uuid@11 override. uuid is only called when a conditional-format
+  // rule needs an x14 extension (data bars), so this round trip goes through that code path.
+  it('round trip with a data-bar rule (exceljs calls uuid) still imports the rows', async () => {
+    const bytes = await xlsxBytes((ws) => {
+      ws.addRow(['Admission no', 'Amount']);
+      ws.addRow(['2024/001', 4500]);
+      ws.addRow(['2024/002', 1200]);
+      ws.addConditionalFormatting({
+        ref: 'B2:B3',
+        rules: [
+          {
+            type: 'dataBar',
+            priority: 1,
+            cfvo: [{ type: 'min' }, { type: 'max' }],
+          } as ExcelJS.ConditionalFormattingRule,
+        ],
+      });
+    });
+    const xml = await (await JSZip.loadAsync(bytes)).file('xl/worksheets/sheet1.xml')!.async('string');
+    expect(xml).toMatch(/<x14:id>\{[0-9A-F-]{36}\}<\/x14:id>/);
+    const sheet = sheetOf(await parseXlsx(bytes, excel));
+    expect(sheet.rows.map((r) => r.cells)).toEqual([
+      ['2024/001', '4500'],
+      ['2024/002', '1200'],
+    ]);
+  });
+
   it('refuses bytes that are not a workbook, and an empty workbook', async () => {
     const bad = await parseXlsx(csvBytes('not,a,workbook'), excel);
     expect(bad.ok).toBe(false);

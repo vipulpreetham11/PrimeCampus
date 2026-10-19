@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 import { toast } from 'sonner';
 import { DataState } from '@/components/shared/DataState';
 import { ErrorText } from '@/components/shared/ErrorText';
@@ -47,26 +47,32 @@ function GroupDialog({
       : { name: '', status: 'active', default_salary_paise: null },
   });
   const existingSalary = group?.default_monthly_salary_paise ?? null;
+  // "Clear default salary" is applied by Save, with the group's version like every other change.
+  const [clearSalary, setClearSalary] = useState(false);
   const onSubmit = form.handleSubmit(async (v) => {
     setError(null);
-    // The server keeps the old default when none is sent; it cannot clear one (save_staff_group).
-    if (canEditSalary && existingSalary !== null && v.default_salary_paise === null) {
-      form.setError('default_salary_paise', { message: 'To change it, enter a new amount.' });
+    // An emptied amount field is not a removal: the server keeps the old default when none is sent.
+    if (canEditSalary && !clearSalary && existingSalary !== null && v.default_salary_paise === null) {
+      form.setError('default_salary_paise', {
+        message: 'Enter an amount, or use “Clear default salary” to remove it.',
+      });
       return;
     }
-    const salaryChanged =
-      canEditSalary && v.default_salary_paise !== (group?.default_monthly_salary_paise ?? null);
+    const salaryChanged = canEditSalary && !clearSalary && v.default_salary_paise !== existingSalary;
     try {
       await save.mutateAsync({
         name: v.name,
         status: v.status,
         default_salary_paise: salaryChanged ? v.default_salary_paise : null,
+        clear_default_salary: canEditSalary && clearSalary,
         ...(group ? { id: group.id, version: group.version } : {}),
       });
       toast.success(group ? 'Staff group saved.' : 'Staff group created.');
       onOpenChange(false);
     } catch (e) {
-      setError(handleSaveError(e, { reload: onReload }));
+      setError(
+        handleSaveError(e, { reload: onReload, form, fields: { default_salary: 'default_salary_paise' } }),
+      );
     }
   });
   return (
@@ -92,7 +98,7 @@ function GroupDialog({
                 ]}
               />
             )}
-            {canSeeSalary && (
+            {canSeeSalary && !clearSalary && (
               <MoneyField
                 control={form.control}
                 name="default_salary_paise"
@@ -100,12 +106,31 @@ function GroupDialog({
                 description={
                   !canEditSalary
                     ? 'Read-only for your role.'
-                    : existingSalary !== null
-                      ? 'Used when a staff member has no own rate. Confidential. It can be changed but not removed.'
+                    : existingSalary === null
+                      ? 'No default salary. Used when a staff member has no own rate. Confidential.'
                       : 'Used when a staff member has no own rate. Confidential.'
                 }
                 disabled={!canEditSalary}
               />
+            )}
+            {canEditSalary && existingSalary !== null && !clearSalary && (
+              <Button type="button" variant="outline" size="sm" onClick={() => setClearSalary(true)}>
+                Clear default salary
+              </Button>
+            )}
+            {clearSalary && (
+              <div
+                role="status"
+                className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-sm"
+              >
+                <span>
+                  The default salary (<MoneyText paise={existingSalary} />) will be removed when you save. The
+                  group will have no default salary — not ₹0.
+                </span>
+                <Button type="button" variant="ghost" size="sm" onClick={() => setClearSalary(false)}>
+                  Undo
+                </Button>
+              </div>
             )}
             <ErrorText error={error} />
             <div className="flex justify-end gap-2">
@@ -168,7 +193,7 @@ export function StaffGroupsPage() {
                   <TableCell>{g.staff_count}</TableCell>
                   {canSeeSalary && (
                     <TableCell data-testid="group-salary">
-                      <MoneyText paise={g.default_monthly_salary_paise} />
+                      <MoneyText paise={g.default_monthly_salary_paise} missing="No default salary" />
                     </TableCell>
                   )}
                   <TableCell>
