@@ -98,7 +98,8 @@ test('K-2. A dialog opens with Enter, takes the focus, closes with Escape and gi
   expect(await page.evaluate(() => !!document.activeElement?.closest('[role="dialog"]'))).toBe(true);
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
-  expect(await focused(page)).toBe('New class');
+  // Radix gives the focus back in a setTimeout(0) after the dialog unmounts
+  await expect.poll(() => focused(page)).toBe('New class');
 
   // a row's action menu: Enter opens, arrows move, Escape closes
   await page.goto('/users');
@@ -111,7 +112,7 @@ test('K-2. A dialog opens with Enter, takes the focus, closes with Escape and gi
   expect(await page.evaluate(() => document.activeElement?.getAttribute('role'))).toBe('menuitem');
   await page.keyboard.press('Escape');
   await expect(menu).toBeHidden();
-  expect(await focused(page)).toBe('Actions for demo.teacher');
+  await expect.poll(() => focused(page)).toBe('Actions for demo.teacher');
   await context.close();
 });
 

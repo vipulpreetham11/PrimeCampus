@@ -146,14 +146,11 @@ test('M2-2. Period-wise day: Meera Rao absent → Ravi Kumar substitutes her Per
   browser,
 }) => {
   test.setTimeout(400_000);
-  test.skip(
-    TODAY !== PERIOD_FROM,
-    `Period-wise attendance can only be marked on ${PERIOD_FROM} (today is ${TODAY})`,
-  );
+  // on the period-wise day (19 Oct 2026); marking a past day is allowed, so later runs repeat it
   const admin = await asAdmin(browser);
   const page = admin.page;
   // staff attendance today: Meera Rao absent, everyone else present
-  await page.goto(`/staff-attendance?date=${TODAY}`);
+  await page.goto(`/staff-attendance?date=${PERIOD_FROM}`);
   await expect(page.getByTestId('staff-roster')).toBeVisible({ timeout: 30_000 });
   const fill = page.getByRole('button', { name: /^(Mark (all|remaining \d+) present|Everyone is marked)$/ });
   if (await fill.isEnabled()) await fill.click();
@@ -167,7 +164,7 @@ test('M2-2. Period-wise day: Meera Rao absent → Ravi Kumar substitutes her Per
     });
   }
   // her Period 1 lesson in Class 1 A is flagged; Ravi Kumar is assigned (once)
-  const p1 = await dayCard(page, TODAY, 'Class 1 A', 'Period 1');
+  const p1 = await dayCard(page, PERIOD_FROM, 'Class 1 A', 'Period 1');
   await expect(
     p1.getByTestId('badge-planned-absent').or(p1.getByTestId('badge-substitute')).first(),
   ).toBeVisible();
@@ -184,7 +181,7 @@ test('M2-2. Period-wise day: Meera Rao absent → Ravi Kumar substitutes her Per
 
   // the substitute marks the period register of that lesson
   const t = await asTeacher(browser, PHONE);
-  await t.page.goto(`/dashboard?date=${TODAY}`);
+  await t.page.goto(`/dashboard?date=${PERIOD_FROM}`);
   const sub = t.page
     .getByTestId('today-lesson')
     .filter({ hasText: 'Mathematics' })
@@ -215,12 +212,12 @@ test("M2-3. Parent (demo.parent) sees real data for Aarav on the period-wise day
   browser,
 }) => {
   test.setTimeout(400_000);
-  test.skip(TODAY !== PERIOD_FROM, `Real data "for today" is created on ${PERIOD_FROM} (today is ${TODAY})`);
+  // the data of the period-wise day (19 Oct 2026: "today" on the first run)
   const note = `Read pages 10–12 aloud (E2E ${RUN})`;
   const hwText = `Learn the five new words — ${RUN}`;
   // the teacher writes today's diary for his English lesson, sets homework and checks Aarav's
   const t = await asTeacher(browser);
-  await t.page.goto(`/dashboard?date=${TODAY}`);
+  await t.page.goto(`/dashboard?date=${PERIOD_FROM}`);
   const english = t.page
     .getByTestId('today-lesson')
     .filter({ hasText: 'English' })
@@ -255,7 +252,7 @@ test("M2-3. Parent (demo.parent) sees real data for Aarav on the period-wise day
   await expect(page.getByTestId('dashboard-parent')).toBeVisible({ timeout: 30_000 });
   await expectDemoSchool(page);
   const day = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(
-    new Date(`${TODAY}T12:00:00Z`),
+    new Date(`${PERIOD_FROM}T12:00:00Z`),
   );
   await page.goto('/child/attendance');
   const record = page.getByTestId('attendance-record').filter({ hasText: day }).first();
@@ -360,10 +357,10 @@ test('M2-5. Attendance overview · diary list incl. "Missing diary only" · home
 }) => {
   test.setTimeout(300_000);
   const { context, page } = await asAdmin(browser);
-  await page.goto(`/attendance?date=${TODAY}`);
+  await page.goto(`/attendance?date=${PERIOD_FROM}`);
   const row = page.getByTestId('overview-row').filter({ hasText: 'Class 1 A' });
   await expect(row).toBeVisible({ timeout: 30_000 });
-  if (TODAY === PERIOD_FROM) await expect(row).not.toContainText('No lessons');
+  await expect(row).not.toContainText('No lessons');
 
   await page.goto('/diary');
   const items = page.getByTestId('diary-item');
