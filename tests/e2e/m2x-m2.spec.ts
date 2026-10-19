@@ -497,6 +497,60 @@ test('M2-8. "Load more" on homework and diary lists only appears past 50 rows (c
   expect(hw.items.length).toBeGreaterThan(0);
 });
 
+test('M2-10. Principal: attendance overview, staff register and homework checks are read-only; writes are FORBIDDEN', async ({
+  browser,
+}) => {
+  test.setTimeout(240_000);
+  const password = await setKnownPassword(op, 'demo.principal');
+  const { context, page } = await newPage(browser, seen);
+  await signIn(page, 'demo.principal', password);
+  await expect(page.getByTestId('context-summary').first()).toContainText('Principal', { timeout: 30_000 });
+  await expectDemoSchool(page);
+  await page.goto(`/attendance?date=${PERIOD_FROM}`);
+  await expect(page.getByTestId('overview-row').filter({ hasText: 'Class 1 A' })).toBeVisible({
+    timeout: 30_000,
+  });
+  await page.goto(`/staff-attendance?date=${PERIOD_FROM}`);
+  await expect(page.getByTestId('staff-roster')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('button', { name: /Save staff attendance/ })).toHaveCount(0);
+  await page.goto('/homework');
+  await page.getByLabel('Set from').fill('2026-10-01');
+  const item = page.getByTestId('homework-item').first();
+  await expect(item).toBeVisible({ timeout: 30_000 });
+  await item.getByRole('link', { name: 'See checks' }).click();
+  await expect(page.getByTestId('homework-roster')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText('You can see the checks but not change them.')).toBeVisible();
+  await context.close();
+
+  const aarav = (
+    await op.school<{ items: { student_id: string; name: string }[] }>('list_students', {
+      p_search: 'Aarav Sharma',
+    })
+  ).items.find((x) => x.name === 'Aarav Sharma')!.student_id;
+  const api = await ApiSession.signIn('demo.principal', password);
+  try {
+    await api.enterDemo('principal');
+    await expect(
+      api.school('mark_staff_attendance', {
+        p_operation_id: crypto.randomUUID(),
+        p_date: PERIOD_FROM,
+        p_marks: [],
+      }),
+    ).rejects.toThrow(/FORBIDDEN/);
+    await expect(
+      api.school('mark_student_attendance', {
+        p_operation_id: crypto.randomUUID(),
+        p_kind: 'daily',
+        p_section_id: ids['Class 1 A'],
+        p_date: '2026-10-17',
+        p_marks: [{ student_id: aarav, status: 'present', expected_version: null }],
+      }),
+    ).rejects.toThrow(/FORBIDDEN/);
+  } finally {
+    await api.signOut();
+  }
+});
+
 test('M2-9. Network audit of these tests', () => {
   expect(seen.length).toBeGreaterThan(10);
   auditNetwork(seen);
