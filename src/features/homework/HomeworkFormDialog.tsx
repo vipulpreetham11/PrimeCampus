@@ -15,15 +15,16 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { isUncertainFailure, useCreateCheck } from '@/lib/create-check';
+import { createOrExisting, isUncertainFailure, useCreateCheck } from '@/lib/create-check';
 import { addDays, compareIsoDates, formatDate } from '@/lib/dates';
 import { toAppError, type AppError } from '@/lib/errors';
 import { isConflict } from '@/lib/save-feedback';
-import { findCreatedHomework, useSaveHomework } from './hooks';
+import { useSaveHomework } from './hooks';
 
 // Set homework from a lesson, or edit / cancel it (with the version the teacher saw).
-// Creating has no operation id: after an uncertain failure the dialog looks for the homework in
-// the lesson's list before the teacher may press "Set homework" again (no duplicates).
+// Creating has no operation id, but the server refuses the same lesson + text twice (DUPLICATE with
+// the homework's id, migration 2310): after an uncertain failure the dialog sends the same request
+// again before the teacher may change anything — never two homeworks.
 
 export const MAX_HOMEWORK_TEXT = 4000;
 
@@ -41,8 +42,8 @@ export function HomeworkFormDialog({
   title,
   onClose,
 }: {
-  /** Create: the lesson the homework is set in, and the homework it already has. */
-  lesson?: { lesson_session_id: number; date: string; section_id: string; existingIds: readonly string[] };
+  /** Create: the lesson the homework is set in. */
+  lesson?: { lesson_session_id: number; date: string };
   /** Edit: the homework as displayed. */
   homework?: EditableHomework;
   title: string;
@@ -98,28 +99,34 @@ export function HomeworkFormDialog({
         },
       );
     } else if (lesson) {
-      const created = () => {
-        toast.success('Homework set.');
-        onClose();
-      };
-      save.mutate(
-        { kind: 'create', lessonId: lesson.lesson_session_id, dueOn, description: trimmed },
-        {
-          onSuccess: created,
-          onError: (e) => {
-            if (!isUncertainFailure(e)) return fail(e);
-            check.verify(
-              () =>
-                findCreatedHomework({
-                  lessonId: lesson.lesson_session_id,
-                  date: lesson.date,
-                  sectionId: lesson.section_id,
-                  description: trimmed,
-                  knownIds: lesson.existingIds,
-                }),
-              created,
-            );
-          },
+      const send = () =>
+        createOrExisting(
+          () =>
+            save.mutateAsync({
+              kind: 'create',
+              lessonId: lesson.lesson_session_id,
+              dueOn,
+              description: trimmed,
+            }),
+          'assignment_id',
+        );
+      send().then(
+        (r) => {
+          // DUPLICATE (2310): the same text is already set for this lesson — nothing new to save
+          toast.success(r.existingId ? 'Already set for this lesson.' : 'Homework set.');
+          onClose();
+        },
+        (e: unknown) => {
+          if (!isUncertainFailure(e)) return fail(e);
+          // a retry is safe now: created, or DUPLICATE = the earlier attempt worked
+          check.verify(
+            send,
+            () => {
+              toast.success('Homework set.');
+              onClose();
+            },
+            fail,
+          );
         },
       );
     }

@@ -94,10 +94,12 @@ export const timetableDraftSavedSchema = z.object({
 export type TimetableDraftSaved = z.infer<typeof timetableDraftSavedSchema>;
 
 export const timetableDiscardedSchema = z.object({ timetable_version_id: id, discarded: z.boolean() });
+// A repeat (2310) returns { timetable_version_id, status: 'active', replayed: true } without next_step.
 export const timetableActivatedSchema = z.object({
   timetable_version_id: id,
   status: z.literal('active'),
-  next_step: z.string(),
+  next_step: z.string().optional(),
+  replayed: z.literal(true).optional(),
 });
 export const timetableCopiedSchema = z.object({
   timetable_version_id: id,
