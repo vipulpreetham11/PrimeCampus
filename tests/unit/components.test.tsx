@@ -13,6 +13,21 @@ const base = { data: undefined, error: null, fetchStatus: 'idle' as const };
 describe('DataState', () => {
   const child = (d: string[]) => <p>rows: {d.join(',')}</p>;
 
+  it('M2X: the previous results of a new query that is paused offline are not shown as its answer', () => {
+    const prev = { ...base, status: 'success' as const, data: ['Aarav', 'Anaya'], isPlaceholderData: true };
+    const { rerender } = render(<DataState query={{ ...prev, fetchStatus: 'paused' }}>{child}</DataState>);
+    expect(screen.getByText('You are offline')).toBeInTheDocument();
+    expect(screen.queryByText(/rows:/)).not.toBeInTheDocument();
+    // online, the previous results stay visible while the new ones load
+    rerender(<DataState query={{ ...prev, fetchStatus: 'fetching' }}>{child}</DataState>);
+    expect(screen.getByText('rows: Aarav,Anaya')).toBeInTheDocument();
+    // cached data of the SAME query, refetch paused offline: still its real data
+    rerender(
+      <DataState query={{ ...prev, isPlaceholderData: false, fetchStatus: 'paused' }}>{child}</DataState>,
+    );
+    expect(screen.getByText('rows: Aarav,Anaya')).toBeInTheDocument();
+  });
+
   it('distinguishes loading, empty, error, forbidden, offline and data', () => {
     const { rerender } = render(
       <DataState query={{ ...base, status: 'pending', fetchStatus: 'fetching' }}>{child}</DataState>,

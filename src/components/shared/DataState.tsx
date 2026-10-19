@@ -13,6 +13,8 @@ export interface QueryLike<T> {
   data: T | undefined;
   error: unknown;
   refetch?: () => unknown;
+  /** The data shown belongs to the previous query (placeholderData: keepPreviousData). */
+  isPlaceholderData?: boolean;
 }
 
 interface DataStateProps<T> {
@@ -71,7 +73,10 @@ export function DataState<T>({
   const offline =
     query.fetchStatus === 'paused' || (isAppError(query.error) && query.error.code === 'NETWORK');
 
-  if (query.status === 'pending') {
+  // A new query (e.g. a new search) that can't run offline: the previous results are not its
+  // answer, so they must not be shown as if they were (found in M2X: an offline search kept showing
+  // the old list).
+  if (query.status === 'pending' || (query.isPlaceholderData && query.fetchStatus === 'paused')) {
     if (offline) {
       return (
         <Panel icon={<CloudOff />} title="You are offline" role="status">

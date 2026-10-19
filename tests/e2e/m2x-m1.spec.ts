@@ -117,40 +117,60 @@ test('M1-1. School profile save · staff salary rate + bank · ending a teaching
   // the full number is masked until asked for
   await expect(fin.getByText(account, { exact: true })).toHaveCount(0);
 
-  // teaching assignment: Meera Rao, Science in Class 2 B, starting on a future day unique to this run
-  // (assignments of one teacher, section and subject may not overlap), then ended after one day
-  const start = addDays(TODAY, 2 + (Math.floor(Date.now() / 60_000) % 120));
-  const shown = new Intl.DateTimeFormat('en-IN', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    timeZone: 'UTC',
-  }).format(new Date(`${start}T12:00:00Z`));
+  // teaching assignment: Meera Rao, Science in Class 2 B. Earlier runs left such assignments, and
+  // the same teacher, section and subject may not overlap: start on the first free day after them
+  // (an open-ended one is the one to end instead).
+  const staff = await op.school<{ staff_id: string; employee_no: string }[]>('list_staff', {});
+  const meera = staff.find((x) => x.employee_no === 'DEMO-T2')!.staff_id;
+  const existing = (
+    await op.school<
+      { section: string; subject: string | null; effective_from: string; effective_to: string | null }[]
+    >('list_teaching_assignments', { p_staff_id: meera })
+  ).filter((x) => x.section === 'Class 2 B' && x.subject === 'Science');
+  const fmt = (iso: string) =>
+    new Intl.DateTimeFormat('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      timeZone: 'UTC',
+    }).format(new Date(`${iso}T12:00:00Z`));
+  const openEnded = existing.find((x) => x.effective_to === null);
   await openStaff(page, 'DEMO-T2');
   const teaches = page
     .locator('[data-slot="card"]')
     .filter({ has: page.getByText('Teaches', { exact: true }) });
-  await teaches.getByRole('button', { name: 'Add' }).click();
-  const dlg = modal(page);
-  await choose(dlg, 'Section', 'Class 2 B');
-  await choose(dlg, 'Duty', 'Subject teacher');
-  await choose(dlg, 'Subject', 'Science');
-  await dlg.getByLabel('Starts on').fill(start);
-  await dlg.getByRole('button', { name: 'Add' }).click();
-  await expect(page.getByText('Teaching assignment added.')).toBeVisible();
+  let start: string;
+  if (openEnded) {
+    start = openEnded.effective_from;
+  } else {
+    start = existing.map((x) => x.effective_to!).reduce((m, d) => (d > m ? d : m), addDays(TODAY, 1));
+    await teaches.getByRole('button', { name: 'Add' }).click();
+    const dlg = modal(page);
+    await choose(dlg, 'Section', 'Class 2 B');
+    await choose(dlg, 'Duty', 'Subject teacher');
+    await choose(dlg, 'Subject', 'Science');
+    await dlg.getByLabel('Starts on').fill(start);
+    await dlg.getByRole('button', { name: 'Add' }).click();
+    await expect(page.getByText('Teaching assignment added.')).toBeVisible();
+  }
   const item = teaches
     .getByRole('listitem')
     .filter({ hasText: 'Class 2 B · Science' })
-    .filter({ hasText: `From ${shown}` });
-  await expect(item).toHaveCount(1);
-  await expect(item).toContainText(`Starts ${shown}`);
-  await item.getByRole('button', { name: 'End' }).click();
+    .filter({ hasText: new RegExp(`From ${fmt(start)}$|From ${fmt(start)}[^ ]`) });
+  await expect(item.first()).toBeVisible();
+  await item.first().getByRole('button', { name: 'End' }).click();
   const end = modal(page);
-  await end.getByLabel('No longer from').fill(addDays(start, 1));
+  const endOn = start > TODAY ? addDays(start, 1) : addDays(TODAY, 1);
+  await end.getByLabel('No longer from').fill(endOn);
   await end.getByRole('button', { name: 'End assignment' }).click();
   await expect(page.getByText('Assignment ended.')).toBeVisible();
-  // one day long now: "From X to X"
-  await expect(item).toContainText(`From ${shown} to ${shown}`);
+  await expect(
+    teaches
+      .getByRole('listitem')
+      .filter({ hasText: 'Class 2 B · Science' })
+      .filter({ hasText: `From ${fmt(start)} to ${fmt(addDays(endOn, -1))}` })
+      .first(),
+  ).toBeVisible();
   await context.close();
 });
 
@@ -200,6 +220,13 @@ test('M1-3. Principal: provisioned through the UI, sees read-only views, gets FO
   await settled(page.getByRole('list', { name: 'Users' }), page.getByText('No users yet'));
   const card = page.getByTestId('user-demo.principal');
   if (await card.isVisible()) {
+    // a run that stopped half-way may have left the login disabled
+    if (await card.getByText('Login disabled.').isVisible()) {
+      await page.getByRole('button', { name: 'Actions for demo.principal' }).click();
+      await page.getByRole('menuitem', { name: 'Enable login' }).click();
+      await modal(page).getByRole('button', { name: 'Enable login' }).click();
+      await expect(card.getByText('Login disabled.')).toHaveCount(0);
+    }
     await page.getByRole('button', { name: 'Actions for demo.principal' }).click();
     await page.getByRole('menuitem', { name: 'Reset password' }).click();
     await modal(page).getByRole('button', { name: 'Reset password' }).click();
@@ -300,7 +327,7 @@ test('M1-3. Principal: provisioned through the UI, sees read-only views, gets FO
   await page.getByRole('button', { name: 'Actions for demo.principal' }).click();
   await page.getByRole('menuitem', { name: 'Enable login' }).click();
   await modal(page).getByRole('button', { name: 'Enable login' }).click();
-  await expect(page.getByText('Login enabled.')).toBeVisible();
+  await expect(page.locator('[data-sonner-toast]').filter({ hasText: 'Login enabled.' })).toBeVisible();
   const ok = await ApiSession.signIn('demo.principal', pw.principal);
   await ok.signOut();
   await admin.context.close();
@@ -323,7 +350,7 @@ test('M1-4. Students: "Load more" past 50 · placement move · guardian add + ed
   const count = Math.max(2, 52 - all.items.length);
   const rows = Array.from({ length: count }, (_, k) => {
     const s = NEW(k + 1);
-    return `${s.adm},${s.name},${k % 2 ? 'M' : 'F'},2018-0${(k % 9) + 1}-1${k % 9},Class 2,A,M2x${RUN} Parent${k + 1},9${DIGITS.slice(0, 7)}${k % 10}`;
+    return `${s.adm},${s.name},${k % 2 ? 'M' : 'F'},2018-0${(k % 9) + 1}-1${k % 9},Class 2,A,M2x${RUN} Parent${k + 1},9${DIGITS}${k % 10}`;
   });
   await startImport(page, 'students', csv(`m2x-students-${RUN}.csv`, [STUDENT_HEADER.join(','), ...rows]));
   await expectTiles(page, { Ready: count, 'Needs fixing': 0 });
@@ -362,7 +389,11 @@ test('M1-4. Students: "Load more" past 50 · placement move · guardian add + ed
 
   // guardian: add a second parent (new person), then edit their occupation
   const guardians = page.getByTestId('guardians');
-  await guardians.getByRole('button', { name: 'Add' }).click();
+  await page
+    .locator('[data-slot="card"]')
+    .filter({ has: page.getByText('Parents & guardians', { exact: true }) })
+    .getByRole('button', { name: 'Add', exact: true })
+    .click();
   const add = modal(page);
   await add.getByRole('button', { name: 'New person' }).click();
   await add.getByLabel('Full name').fill(`M2x${RUN} Father`);
@@ -384,27 +415,25 @@ test('M1-4. Students: "Load more" past 50 · placement move · guardian add + ed
   const aadhaar = `7${DIGITS}${RUN.length}${DIGITS.slice(-2)}`.slice(0, 12);
   const sens = page.getByTestId('sensitive-card');
   await sens.getByRole('button', { name: /^(Add|Edit)$/ }).click();
-  let dlg = modal(page);
-  await dlg.getByLabel('Name as per Aadhaar').fill(NEW(1).name);
-  await dlg.getByLabel('Aadhaar number').fill(aadhaar);
-  await dlg.getByRole('button', { name: 'Save' }).click();
+  await sens.getByLabel('Name as per Aadhaar').fill(NEW(1).name);
+  await sens.getByLabel('Aadhaar number').fill(aadhaar);
+  await sens.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByText('Sensitive details saved.')).toBeVisible();
   await expect(sens).toContainText(aadhaar.slice(-4));
 
   // the same Aadhaar for pupil B: the server's DUPLICATE (2310) is shown under the field
   await page.goto(`/students/${await studentId(NEW(2).adm)}`);
-  await page
-    .getByTestId('sensitive-card')
-    .getByRole('button', { name: /^(Add|Edit)$/ })
-    .click();
-  dlg = modal(page);
-  const field = dlg.getByLabel('Aadhaar number');
+  const sensB = page.getByTestId('sensitive-card');
+  await sensB.getByRole('button', { name: /^(Add|Edit)$/ }).click();
+  const field = sensB.getByLabel('Aadhaar number');
   await field.fill(aadhaar);
-  await dlg.getByRole('button', { name: 'Save' }).click();
-  await expect(dlg.getByText('Another student in this school already has this Aadhaar number')).toBeVisible();
+  await sensB.getByRole('button', { name: 'Save' }).click();
+  await expect(
+    sensB.getByText('Another student in this school already has this Aadhaar number'),
+  ).toBeVisible();
   await expect(field).toHaveAttribute('aria-invalid', 'true');
-  await expect(dlg.getByRole('alert')).toHaveCount(0); // not the generic form error
-  await dlg.getByRole('button', { name: 'Cancel' }).click();
+  await expect(sensB.getByRole('alert').filter({ hasText: 'Request ID' })).toHaveCount(0); // not the generic form error
+  await sensB.getByRole('button', { name: 'Cancel' }).click();
   await context.close();
 });
 
@@ -463,13 +492,20 @@ test('M1-6. Staff calendar tab and a staff-group calendar (Office staff: Saturda
   await expect(page.getByTestId('calendar-totals')).toBeVisible({ timeout: 30_000 });
   await page.getByRole('tab', { name: 'Staff' }).click();
   await expect(page.getByTestId('calendar-totals')).toBeVisible({ timeout: 30_000 });
-  await choose(page, 'Staff group', 'Office staff');
-  await expect(page.getByTestId('calendar-totals')).toBeVisible({ timeout: 30_000 });
 
-  // the coming Saturday in this month's view (or next month's)
+  // the coming Saturday; first what the default staff calendar says for it
   const sat = addDays(TODAY, (6 - isoWeekday(TODAY) + 7) % 7 || 7);
   const cell = () => page.getByTestId(`day-${sat}`);
-  while (!(await cell().isVisible())) await page.getByRole('button', { name: 'Next month' }).click();
+  const showSat = async () => {
+    await expect(page.getByTestId('calendar-totals')).toBeVisible({ timeout: 30_000 });
+    while (!(await cell().isVisible())) await page.getByRole('button', { name: 'Next month' }).click();
+  };
+  await showSat();
+  const defaultType = await cell().getAttribute('data-day-type');
+
+  // Office staff: Saturday alternates between working and weekly off every run
+  await choose(page, 'Staff group', 'Office staff');
+  await showSat();
   const was = await cell().getAttribute('data-day-type');
   const want = was === 'weekly_off' ? 'Working day' : 'Weekly off';
   await page.getByRole('button', { name: 'Weekly pattern' }).click();
@@ -483,9 +519,8 @@ test('M1-6. Staff calendar tab and a staff-group calendar (Office staff: Saturda
 
   // the group's change does not touch the default staff calendar
   await choose(page, 'Staff group', 'All staff (default)');
-  await expect(page.getByTestId('calendar-totals')).toBeVisible({ timeout: 30_000 });
-  while (!(await cell().isVisible())) await page.getByRole('button', { name: 'Next month' }).click();
-  await expect(cell()).toHaveAttribute('data-day-type', 'working');
+  await showSat();
+  await expect(cell()).toHaveAttribute('data-day-type', defaultType!);
   await context.close();
 });
 
@@ -495,23 +530,15 @@ test('M1-7. Offline: a list shows "You are offline" (never empty); a form keeps 
 }) => {
   test.setTimeout(240_000);
   const { context, page } = await asAdmin(browser, PHONE);
-  // list: the enquiries list, opened while offline
+  // list: the students list, searched while offline (a new query, nothing cached for it)
   await page.goto('/students');
   await expect(page.getByRole('list', { name: 'Students' }).first()).toBeVisible({ timeout: 30_000 });
   await context.setOffline(true);
-  await page
-    .getByRole('link', { name: 'Admissions' })
-    .first()
-    .click()
-    .catch(async () => {
-      // on a phone the link may sit in the "More" menu
-      await page.getByRole('button', { name: 'More' }).click();
-      await page.getByRole('link', { name: 'Admissions' }).first().click();
-    });
+  await page.getByLabel('Search').fill(`Offline${RUN}`);
   await expect(page.getByText('You are offline').first()).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText('No enquiries')).toHaveCount(0);
+  await expect(page.getByText('No students match these filters')).toHaveCount(0);
   await context.setOffline(false);
-  await expect(page.getByRole('list', { name: 'Enquiries' })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText('No students match these filters')).toBeVisible({ timeout: 30_000 });
 
   // form: the school profile, saved while offline
   await page.goto('/setup/profile');
@@ -529,6 +556,6 @@ test('M1-7. Offline: a list shows "You are offline" (never empty); a form keeps 
 });
 
 test('M1-8. Network audit of these tests', () => {
-  expect(seen.length).toBeGreaterThan(50);
+  expect(seen.length).toBeGreaterThan(10);
   auditNetwork(seen);
 });

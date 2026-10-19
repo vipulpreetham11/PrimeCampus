@@ -92,7 +92,10 @@ export function PatternDialog({
         day_type: (p?.day_type ??
           (w.iso === 7 ? 'weekly_off' : 'working')) as (typeof PATTERN_DAY_TYPES)[number],
         period_schedule_id: p?.period_schedule_id ?? null,
-        inherited: staffGroupId !== null && !own,
+        inherited: staffGroupId !== null && !own && !!fallback,
+        // Nothing saved for this weekday at all: the server treats it as a weekly off, so the row shown
+        // here (a suggested week) must be saved, not skipped as "unchanged" (found in M2X).
+        unsaved: !p,
       };
     }),
   );
@@ -102,7 +105,7 @@ export function PatternDialog({
     rows[i]!.period_schedule_id !== initial[i]!.period_schedule_id;
   // A staff group saves only the weekdays changed here; the rest keep following the school default.
   // The school default itself saves the whole week.
-  const toSave = rows.filter((_, i) => staffGroupId === null || isChanged(i));
+  const toSave = rows.filter((r, i) => staffGroupId === null || isChanged(i) || r.unsaved);
   // Student half days need a bell schedule (SQL check on calendar_patterns).
   const missing = rows.some(
     (r) => audience === 'student' && r.day_type === 'half_day' && !r.period_schedule_id,
@@ -132,7 +135,13 @@ export function PatternDialog({
                   <span className="block font-medium">{w.long}</span>
                   {staffGroupId !== null && (
                     <span className="text-muted-foreground block text-xs">
-                      {isChanged(i) ? 'Changed' : r.inherited ? 'School default' : 'Set for this group'}
+                      {isChanged(i)
+                        ? 'Changed'
+                        : r.unsaved
+                          ? 'Not set yet'
+                          : r.inherited
+                            ? 'School default'
+                            : 'Set for this group'}
                     </span>
                   )}
                 </span>
