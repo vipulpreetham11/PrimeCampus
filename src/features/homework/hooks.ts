@@ -24,6 +24,8 @@ function useInvalidateHomework() {
         'schedule',
         'student-homework',
         'diary-entry',
+        'academic-coverage',
+        'dashboard',
       ].map((f) => qc.invalidateQueries({ queryKey: key(f) })),
     );
 }
@@ -151,7 +153,7 @@ export function useInvalidateHomeworkChecks() {
   const qc = useQueryClient();
   return () =>
     Promise.all(
-      ['homework-list', 'teacher-today', 'student-homework'].map((f) =>
+      ['homework-list', 'teacher-today', 'student-homework', 'academic-coverage', 'dashboard'].map((f) =>
         qc.invalidateQueries({ queryKey: key(f) }),
       ),
     );

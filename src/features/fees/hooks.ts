@@ -49,6 +49,8 @@ const SETUP_STALE = 60_000;
 
 /** Every query that shows money that a fee mutation can change. */
 const MONEY_FEATURES = [
+  'fee-head-report',
+  'dashboard',
   'fee-statement',
   'fee-dues',
   'fee-day-book',
