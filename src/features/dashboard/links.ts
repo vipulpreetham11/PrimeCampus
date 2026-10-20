@@ -25,6 +25,44 @@ export const dashboardLinks = {
   coverage: () => '/reports/coverage',
 };
 
+export interface SetupIssueGroup {
+  code: string;
+  /** "12 sections have no active timetable", or the single issue's own message. */
+  title: string;
+  issues: SetupIssue[];
+  fix: { to: string; label: string };
+}
+
+const GROUP_TITLE: Record<string, (n: number) => string> = {
+  no_timetable: (n) => `${n} ${n === 1 ? 'section has' : 'sections have'} no active timetable`,
+  no_class_teacher: (n) => `${n} ${n === 1 ? 'section has' : 'sections have'} no class teacher today`,
+};
+
+/**
+ * Per-section issues grouped by kind (a school with many sections would otherwise get a list that
+ * fills the whole dashboard; found on the live Demo School at 375px). Order: the server's.
+ */
+export function groupSetupIssues(issues: SetupIssue[]): SetupIssueGroup[] {
+  const groups: SetupIssueGroup[] = [];
+  for (const i of issues) {
+    const g = groups.find((x) => x.code === i.code);
+    if (g) g.issues.push(i);
+    else
+      groups.push({
+        code: i.code,
+        title: i.message,
+        issues: [i],
+        fix: setupIssueLink({ ...i, section_id: undefined }),
+      });
+  }
+  for (const g of groups) {
+    const title = GROUP_TITLE[g.code];
+    if (title && g.issues.length > 1) g.title = title(g.issues.length);
+    else if (g.issues.length === 1) g.fix = setupIssueLink(g.issues[0]!);
+  }
+  return groups;
+}
+
 /** Where each setup issue is fixed. */
 export function setupIssueLink(issue: SetupIssue): { to: string; label: string } {
   switch (issue.code) {

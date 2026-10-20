@@ -128,7 +128,8 @@ test('2. demo.admin signs in with the temp password, is forced to change it, lan
   const summary = page.getByTestId('context-summary');
   await expect(summary).toContainText('Demo School');
   await expect(summary).toContainText('Admin');
-  await expect(page.getByText('Coming in module M4')).toBeVisible();
+  // M4 replaced the placeholder with the real dashboard
+  await expect(page.getByRole('heading', { name: 'Admin dashboard' })).toBeVisible();
   await expect(page.getByText('Password changed.')).toBeHidden({ timeout: 10_000 }); // toast clears
   await page.screenshot({ path: `${SCREENS}/375-admin-shell.png`, fullPage: true });
 

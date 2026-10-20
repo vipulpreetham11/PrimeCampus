@@ -4,7 +4,7 @@ import { attendanceRegisterSchema } from '@/contracts/reports';
 import { salaryMonthSchema } from '@/contracts/salary';
 import { contextSchema } from '@/contracts/session';
 import { feeHeadReportSchema } from '@/contracts/reports';
-import { dashboardLinks, setupIssueLink } from '@/features/dashboard/links';
+import { dashboardLinks, groupSetupIssues, setupIssueLink } from '@/features/dashboard/links';
 import {
   cellLong,
   cellShort,
@@ -365,6 +365,20 @@ describe('dashboard numbers link to pages with the same rules', () => {
     expect(dashboardLinks.uncoveredLessons('2026-10-20')).toBe('/schedule?date=2026-10-20&uncovered=1');
     expect(dashboardLinks.dayBook('2026-10-20')).toBe('/fees/day-book?from=2026-10-20&to=2026-10-20');
     expect(dashboardLinks.salary('2026-09-01')).toBe('/salary?month=2026-09');
+  });
+  it('per-section setup issues are grouped with a count (many sections stay one line each kind)', () => {
+    const issues = [
+      { code: 'no_timetable', message: 'Class 1 A has no active timetable', section_id: M4.section },
+      { code: 'no_timetable', message: 'Class 1 B has no active timetable', section_id: M4.student1 },
+      { code: 'no_class_teacher', message: 'Class 1 B has no class teacher today', section_id: M4.student1 },
+      { code: 'no_attendance_mode', message: 'Attendance mode is not chosen (day-wise is used)' },
+    ];
+    const g = groupSetupIssues(issues);
+    expect(g.map((x) => [x.title, x.issues.length, x.fix.to])).toEqual([
+      ['2 sections have no active timetable', 2, '/timetable'],
+      ['Class 1 B has no class teacher today', 1, '/staff/teaching'],
+      ['Attendance mode is not chosen (day-wise is used)', 1, '/setup/attendance-mode'],
+    ]);
   });
   it('every setup issue links to the page that fixes it', () => {
     expect(setupIssueLink({ code: 'no_timetable', message: 'm', section_id: M4.section }).to).toBe(

@@ -14,7 +14,7 @@ import { formatDateLong, formatDayShort, formatMonth, isIsoDate, schoolToday } f
 import { useCan } from '@/lib/scope';
 import { useSession } from '@/lib/session/store';
 import { useDashboard } from './hooks';
-import { dashboardLinks as L, setupIssueLink } from './links';
+import { dashboardLinks as L, groupSetupIssues, setupIssueLink } from './links';
 
 // Role home screens (PRD §16) from ONE call, get_dashboard(date): the server includes a block only
 // when the role has its capability, and this page renders exactly the blocks it receives — Admin
@@ -329,20 +329,37 @@ function SetupIssues({ d }: { d: Dashboard }) {
       </CardHeader>
       <CardContent>
         <ul className="space-y-1 text-sm">
-          {issues.map((i, n) => {
-            const fix = setupIssueLink(i);
-            return (
-              <li
-                key={`${i.code}-${i.section_id ?? n}`}
-                className="flex flex-wrap justify-between gap-2 border-b py-1.5 last:border-b-0"
-              >
-                <span>{i.message}</span>
-                <Link to={fix.to} className="underline">
-                  Fix in {fix.label}
+          {groupSetupIssues(issues).map((g) => (
+            <li key={g.code} className="border-b py-1.5 last:border-b-0" data-testid="setup-issue">
+              <div className="flex flex-wrap justify-between gap-2">
+                <span>{g.title}</span>
+                <Link to={g.fix.to} className="underline">
+                  Fix in {g.fix.label}
                 </Link>
-              </li>
-            );
-          })}
+              </div>
+              {g.issues.length > 1 && (
+                <details className="mt-1">
+                  <summary className="text-muted-foreground cursor-pointer text-xs">Show sections</summary>
+                  <ul className="mt-1 space-y-0.5">
+                    {g.issues.map((i, n) => {
+                      const fix = setupIssueLink(i);
+                      return (
+                        <li
+                          key={`${i.section_id ?? n}`}
+                          className="flex flex-wrap justify-between gap-2 text-xs"
+                        >
+                          <span>{i.message}</span>
+                          <Link to={fix.to} className="underline">
+                            Fix
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </details>
+              )}
+            </li>
+          ))}
         </ul>
       </CardContent>
     </Card>

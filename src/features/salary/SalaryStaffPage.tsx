@@ -298,7 +298,10 @@ function Calculator({ staffId, month, row }: { staffId: string; month: string; r
   const c = preview.data;
   const canSave =
     !!c &&
+    // what is saved must be what is on screen: not while the calculation is being refreshed
+    // (found live: after adding paid leave, Save was enabled while the old numbers were shown)
     !preview.isPlaceholderData &&
+    !preview.isFetching &&
     !preview.isError &&
     !dirty &&
     c.payable_paise !== null &&
