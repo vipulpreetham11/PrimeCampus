@@ -19,6 +19,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
@@ -37,7 +38,7 @@ import { useAssignSubstitute, useRemoveSubstitute, useSubstituteSuggestions, use
 // (class subjects only; the server refuses once attendance/diary/homework exists), substitutes.
 // Every change sends the lesson version the user saw; CONFLICT reloads the day.
 
-type Open = 'cancel' | 'restore' | 'subject' | 'substitute' | 'remove' | null;
+type Open = 'cancel' | 'restore' | 'subject' | 'time' | 'substitute' | 'remove' | null;
 
 export function LessonActions({ lesson, date }: { lesson: ScheduleLesson; date: string }) {
   const [open, setOpen] = useState<Open>(null);
@@ -66,6 +67,7 @@ export function LessonActions({ lesson, date }: { lesson: ScheduleLesson; date: 
           {!cancelled && (
             <DropdownMenuItem onSelect={() => setOpen('subject')}>Change subject</DropdownMenuItem>
           )}
+          {!cancelled && <DropdownMenuItem onSelect={() => setOpen('time')}>Change time</DropdownMenuItem>}
           {!cancelled && (
             <DropdownMenuItem onSelect={() => setOpen('cancel')}>Cancel lesson</DropdownMenuItem>
           )}
@@ -77,6 +79,7 @@ export function LessonActions({ lesson, date }: { lesson: ScheduleLesson; date: 
       {open === 'cancel' && <CancelDialog lesson={lesson} date={date} onClose={close} />}
       {open === 'restore' && <RestoreDialog lesson={lesson} onClose={close} />}
       {open === 'subject' && <ChangeSubjectDialog lesson={lesson} onClose={close} />}
+      {open === 'time' && <ChangeTimeDialog lesson={lesson} date={date} onClose={close} />}
       {open === 'substitute' && <SubstituteDialog lesson={lesson} date={date} onClose={close} />}
       {open === 'remove' && <RemoveSubstituteDialog lesson={lesson} onClose={close} />}
     </>
@@ -263,6 +266,117 @@ function ChangeSubjectDialog({ lesson, onClose }: { lesson: ScheduleLesson; onCl
             }
           >
             Change subject
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** 'HH:MM' from a Postgres time ('09:05:00'). */
+export function hhmm(time: string): string {
+  return time.slice(0, 5);
+}
+
+/** Client check before sending (the server checks again, plus overlaps): end after start. */
+export function timeRangeProblem(start: string, end: string): string | null {
+  if (!/^d{2}:d{2}$/.test(start) || !/^d{2}:d{2}$/.test(end)) return 'Choose a start and an end time';
+  return end > start ? null : 'The end time must be later than the start time';
+}
+
+// TIME-02: one lesson on one date gets another time. The server refuses an overlap with another
+// lesson of the section or of the teacher (VALIDATION_ERROR, shown as is). A past lesson may change
+// too (it corrects history).
+function ChangeTimeDialog({
+  lesson,
+  date,
+  onClose,
+}: {
+  lesson: ScheduleLesson;
+  date: string;
+  onClose: () => void;
+}) {
+  const [start, setStart] = useState(hhmm(lesson.start_time));
+  const [end, setEnd] = useState(hhmm(lesson.end_time));
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState<AppError | null>(null);
+  const update = useUpdateLesson();
+  const problem = timeRangeProblem(start, end);
+  const unchanged = start === hhmm(lesson.start_time) && end === hhmm(lesson.end_time);
+  return (
+    <Dialog open onOpenChange={(o) => !o && !update.isPending && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Change the time of this lesson</DialogTitle>
+          <DialogDescription>
+            {lessonTitle(lesson, date)}. Only this date changes; the timetable stays the same.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-1.5">
+            <Label htmlFor="time-start">Starts at</Label>
+            <Input
+              id="time-start"
+              type="time"
+              className="min-h-11"
+              value={start}
+              onChange={(e) => setStart(e.target.value)}
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="time-end">Ends at</Label>
+            <Input
+              id="time-end"
+              type="time"
+              className="min-h-11"
+              value={end}
+              onChange={(e) => setEnd(e.target.value)}
+            />
+          </div>
+        </div>
+        {problem && start && end && (
+          <p className="text-destructive text-sm" role="alert">
+            {problem}
+          </p>
+        )}
+        <div className="grid gap-1.5">
+          <Label htmlFor="time-reason">Reason (optional)</Label>
+          <Textarea
+            id="time-reason"
+            value={reason}
+            maxLength={500}
+            onChange={(e) => setReason(e.target.value)}
+          />
+        </div>
+        <ErrorText error={error} />
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={update.isPending}>
+            Cancel
+          </Button>
+          <Button
+            disabled={problem !== null || unchanged || update.isPending}
+            onClick={() => {
+              setError(null);
+              update.mutate(
+                {
+                  lessonId: lesson.lesson_session_id,
+                  version: lesson.version,
+                  action: 'change_time',
+                  startTime: start,
+                  endTime: end,
+                  reason: reason.trim() || null,
+                },
+                {
+                  onSuccess: () => {
+                    toast.success(`Time changed to ${formatTime(start)}–${formatTime(end)}.`);
+                    onClose();
+                  },
+                  onError: (e) => onLessonError(e, setError, onClose),
+                },
+              );
+            }}
+          >
+            Change time
           </Button>
         </DialogFooter>
       </DialogContent>

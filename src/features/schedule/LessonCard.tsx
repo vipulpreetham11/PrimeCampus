@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import { BookOpen, NotebookPen } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import type { ResolvedDayInfo, ScheduleLesson } from '@/contracts/timetable';
+import type { LessonSource, ResolvedDayInfo, ScheduleLesson } from '@/contracts/timetable';
 import { formatTime } from '@/lib/dates';
 import { cn } from '@/lib/utils';
 
@@ -26,6 +26,28 @@ export function dayTypeText(day: ResolvedDayInfo): string {
 
 export function isWorkingDay(day: ResolvedDayInfo): boolean {
   return (day?.weight ?? 0) > 0;
+}
+
+/** TIME-02: an extra lesson, or one changed on this date (time or subject), says so in words. */
+export function LessonSourceBadge({ source }: { source: LessonSource }) {
+  if (source === 'extra')
+    return (
+      <Badge variant="outline" className="border-sky-600" data-testid="badge-extra">
+        Extra lesson
+      </Badge>
+    );
+  if (source === 'override')
+    return (
+      <Badge variant="outline" className="border-sky-600" data-testid="badge-changed">
+        Changed for this date
+      </Badge>
+    );
+  return null;
+}
+
+/** A scheduled lesson whose teacher (after any substitution) is marked absent: nobody covers it. */
+export function isUncovered(lesson: ScheduleLesson): boolean {
+  return lesson.status === 'scheduled' && lesson.actual_teacher_absent === true;
 }
 
 export function LessonCard({
@@ -65,6 +87,12 @@ export function LessonCard({
         {cancelled && (
           <Badge variant="destructive" data-testid="badge-cancelled">
             Cancelled{lesson.cancel_reason ? ` — ${lesson.cancel_reason}` : ''}
+          </Badge>
+        )}
+        <LessonSourceBadge source={lesson.source} />
+        {isUncovered(lesson) && (
+          <Badge variant="outline" className="border-amber-500" data-testid="badge-not-covered">
+            Teacher absent — not covered
           </Badge>
         )}
         {lesson.is_substituted && !lesson.unassigned && (

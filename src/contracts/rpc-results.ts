@@ -73,6 +73,7 @@ import {
   startImportResultSchema,
 } from './imports';
 import {
+  extraLessonAddedSchema,
   lessonUpdatedSchema,
   lessonsGeneratedSchema,
   scheduleDaySchema,
@@ -237,6 +238,7 @@ export const RPC_RESULT_SCHEMAS = {
   get_date_schedule: z.array(scheduleLessonSchema),
   get_schedule_range: z.array(scheduleDaySchema),
   update_lesson_session: lessonUpdatedSchema,
+  add_extra_lesson: extraLessonAddedSchema,
   suggest_substitutes: z.array(substituteSuggestionSchema),
   assign_substitute: substituteAssignedSchema,
   remove_substitute: lessonUpdatedSchema,

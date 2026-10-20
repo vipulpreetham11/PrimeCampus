@@ -129,6 +129,9 @@ export type LessonsGenerated = z.infer<typeof lessonsGeneratedSchema>;
 // Dated lessons (get_date_schedule / get_schedule_range) and lesson actions
 
 export const LESSON_STATUSES = ['scheduled', 'cancelled'] as const;
+/** lesson_sessions.source: from the timetable, changed on the date (time/subject), or an extra lesson. */
+export const LESSON_SOURCES = ['timetable', 'override', 'extra'] as const;
+export type LessonSource = (typeof LESSON_SOURCES)[number];
 
 export const scheduleLessonSchema = z.object({
   lesson_session_id: z.number().int(),
@@ -147,6 +150,9 @@ export const scheduleLessonSchema = z.object({
   status: z.enum(LESSON_STATUSES),
   cancel_reason: z.string().nullable(),
   version: z.number().int(),
+  source: z.enum(LESSON_SOURCES),
+  /** 2410: the teacher who takes the lesson (after substitution) is marked absent; null = not marked. */
+  actual_teacher_absent: z.boolean().nullable(),
   /** null = the planned teacher's attendance is not marked (or there is no planned teacher). */
   planned_teacher_absent: z.boolean().nullable(),
   planned_teacher_half_day: z.boolean().nullable(),
@@ -178,6 +184,13 @@ export type ScheduleDay = z.infer<typeof scheduleDaySchema>;
 
 export const lessonUpdatedSchema = z.object({
   lesson_session_id: z.number().int(),
+  version: z.number().int(),
+});
+
+/** add_extra_lesson (2400): extra lessons take the highest free slot number of the day. */
+export const extraLessonAddedSchema = z.object({
+  lesson_session_id: z.number().int(),
+  slot_ordinal: z.number().int(),
   version: z.number().int(),
 });
 
@@ -246,6 +259,7 @@ export const teacherTodaySchema = z.object({
       attendance_marked: count,
       eligible: count,
       version: z.number().int(),
+      source: z.enum(LESSON_SOURCES),
       has_diary: z.boolean(),
       homework_count: count,
     }),

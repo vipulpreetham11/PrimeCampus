@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  addExtraLesson,
   assignSubstitute,
   getDateSchedule,
   getScheduleRange,
@@ -48,20 +49,63 @@ export function useScheduleRange(from: string, to: string, f: ScheduleFilter, en
 export type LessonAction =
   | { action: 'cancel'; reason: string }
   | { action: 'restore' }
-  | { action: 'change_subject'; subjectId: string };
+  | { action: 'change_subject'; subjectId: string }
+  | { action: 'change_time'; startTime: string; endTime: string; reason: string | null };
+
+/** The exact update_lesson_session arguments (unit-tested). Times are 'HH:MM' wall-clock school time. */
+export function lessonActionArgs(v: { lessonId: number; version: number } & LessonAction) {
+  return {
+    p_lesson_session_id: v.lessonId,
+    p_action: v.action,
+    p_expected_version: v.version,
+    ...(v.action === 'cancel' ? { p_reason: v.reason } : {}),
+    ...(v.action === 'change_subject' ? { p_subject_id: v.subjectId } : {}),
+    ...(v.action === 'change_time'
+      ? { p_start_time: v.startTime, p_end_time: v.endTime, ...(v.reason ? { p_reason: v.reason } : {}) }
+      : {}),
+  };
+}
 
 export function useUpdateLesson() {
   const invalidate = useInvalidateLessons();
   return useMutation({
     mutationFn: (v: { lessonId: number; version: number } & LessonAction) =>
-      updateLessonSession({
-        p_lesson_session_id: v.lessonId,
-        p_action: v.action,
-        p_expected_version: v.version,
-        ...(v.action === 'cancel' ? { p_reason: v.reason } : {}),
-        ...(v.action === 'change_subject' ? { p_subject_id: v.subjectId } : {}),
-      }),
+      updateLessonSession(lessonActionArgs(v)),
     onSettled: invalidate,
+  });
+}
+
+export interface ExtraLessonInput {
+  sectionId: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  subjectId: string;
+  staffId: string | null;
+  label: string | null;
+  reason: string | null;
+}
+
+/** add_extra_lesson arguments (unit-tested): optional fields are left out when empty. */
+export function extraLessonArgs(v: ExtraLessonInput) {
+  return {
+    p_section_id: v.sectionId,
+    p_date: v.date,
+    p_start_time: v.startTime,
+    p_end_time: v.endTime,
+    p_subject_id: v.subjectId,
+    ...(v.staffId ? { p_staff_id: v.staffId } : {}),
+    ...(v.label ? { p_label: v.label } : {}),
+    ...(v.reason ? { p_reason: v.reason } : {}),
+  };
+}
+
+/** No operation id: a repeat of the same extra lesson is refused as DUPLICATE with its id. */
+export function useAddExtraLesson() {
+  const invalidate = useInvalidateLessons();
+  return useMutation({
+    mutationFn: (v: ExtraLessonInput) => addExtraLesson(extraLessonArgs(v)),
+    onSettled: () => void invalidate(),
   });
 }
 

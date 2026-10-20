@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { DateInput } from '@/components/shared/DateInput';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   SectionSelect,
@@ -12,6 +15,7 @@ import {
 } from '@/features/timetable/pickers';
 import { addDays, formatDateLong, formatDayShort, isIsoDate, schoolToday, weekStart } from '@/lib/dates';
 import { useCan, useCanAny } from '@/lib/scope';
+import { ExtraLessonDialog } from './ExtraLessonDialog';
 import { LessonActions } from './LessonActions';
 import { DayView, WeekView } from './ScheduleViews';
 
@@ -28,6 +32,8 @@ export function SchedulePage() {
   const view = params.get('view') === 'week' ? 'week' : 'day';
   const sectionId = params.get('section');
   const staffId = params.get('staff');
+  const onlyUncovered = params.get('uncovered') === '1';
+  const [adding, setAdding] = useState(false);
   const { options: sections } = useSectionOptions();
   const { options: teachers } = useTeacherOptions();
 
@@ -57,9 +63,12 @@ export function SchedulePage() {
         title="Schedule"
         description="Dated lessons with substitutes, cancellations and teacher absence."
         actions={
-          <Button asChild variant="outline">
-            <Link to="/schedule/substitutions">Substitution history</Link>
-          </Button>
+          <>
+            {canManage && <Button onClick={() => setAdding(true)}>Add extra lesson</Button>}
+            <Button asChild variant="outline">
+              <Link to="/schedule/substitutions">Substitution history</Link>
+            </Button>
+          </>
         }
       />
       <div className="flex flex-wrap items-end gap-3">
@@ -119,6 +128,14 @@ export function SchedulePage() {
             options={teachers}
           />
         )}
+        <div className="flex min-h-11 items-center gap-2">
+          <Switch
+            id="schedule-uncovered"
+            checked={onlyUncovered}
+            onCheckedChange={(v) => update({ uncovered: v ? '1' : null })}
+          />
+          <Label htmlFor="schedule-uncovered">Teacher absent, not covered</Label>
+        </div>
       </div>
       <h2 className="text-base font-semibold">
         {view === 'week' ? `Week of ${formatDayShort(from)} – ${formatDayShort(to)}` : formatDateLong(date)}
@@ -132,6 +149,7 @@ export function SchedulePage() {
             showSection={!sectionId}
             lessonLink={lessonLink}
             actions={actions}
+            onlyUncovered={onlyUncovered}
           />
         ) : (
           <p className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
@@ -145,8 +163,10 @@ export function SchedulePage() {
           showSection={!sectionId}
           lessonLink={lessonLink}
           actions={actions}
+          onlyUncovered={onlyUncovered}
         />
       )}
+      {adding && <ExtraLessonDialog date={date} sectionId={sectionId} onClose={() => setAdding(false)} />}
     </div>
   );
 }
