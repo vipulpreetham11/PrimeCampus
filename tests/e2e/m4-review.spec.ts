@@ -31,7 +31,8 @@ let op: ApiSession;
 test.beforeAll(async () => {
   op = await operatorSession();
   await op.enterDemo();
-  for (const u of ['admin', 'principal', 'accountant']) pw[u] = await setKnownPassword(op, `demo.${u}`);
+  for (const u of ['admin', 'principal', 'accountant', 'teacher'])
+    pw[u] = await setKnownPassword(op, `demo.${u}`);
   const staff = await op.school<{ staff_id: string; name: string; staff_group_id: string }[]>(
     'list_staff',
     {},
@@ -470,4 +471,44 @@ test('R6. A page left open after the server ended the session goes to sign-in wi
     'Your session has ended. Please sign in again.',
   );
   await admin.context.close();
+});
+
+// ============================================================================ R7. the M2-3 race, forced
+test('R7. Homework saved while the lesson page’s first list load is still in flight is listed (the M2-3 flake, reproduced on purpose)', async ({
+  browser,
+}) => {
+  test.setTimeout(180_000);
+  type L = { lesson_session_id: number; source: string; status: string; subject: string };
+  const extra = (
+    await op.school<L[]>('get_date_schedule', { p_date: '2026-10-19', p_section_id: ids.sectionA })
+  ).find((l) => l.source === 'extra' && l.status === 'scheduled' && l.subject === 'English');
+  expect(extra, 'the extra English lesson of m4.spec on 19 Oct').toBeTruthy();
+  const s = await as(browser, 'demo.teacher', pw.teacher!, 'dashboard-teacher');
+  const page = s.page;
+  // hold the FIRST list_homework answer for 6 s: the save below settles while it is still in flight,
+  // exactly the order the API gateway logged for the failed M2-3 run
+  let held = false;
+  const lists: string[] = [];
+  await page.route('**/rest/v1/rpc/list_homework', async (route) => {
+    const first = !held;
+    held = true;
+    lists.push(`${first ? 'first (held 6 s)' : 'next'} sent ${new Date().toISOString()}`);
+    const response = await route.fetch();
+    if (first) await new Promise((r) => setTimeout(r, 6_000));
+    // the held first load may have been cancelled by the page meanwhile
+    await route.fulfill({ response }).catch(() => undefined);
+  });
+  await page.goto(`/lessons/${extra!.lesson_session_id}`);
+  await expect(page.getByTestId('lesson-page')).toBeVisible({ timeout: 30_000 });
+  const text = `Race check — ${RUN}`;
+  await page.getByRole('button', { name: 'Set homework' }).click();
+  const d = modal(page);
+  await d.getByLabel('Homework').fill(text);
+  await d.getByRole('button', { name: 'Set homework' }).click();
+  await expect(d).toBeHidden({ timeout: 30_000 });
+  await expect(page.getByTestId('lesson-homework').filter({ hasText: text })).toBeVisible({
+    timeout: 30_000,
+  });
+  expect(lists.length, lists.join('\n')).toBeGreaterThanOrEqual(2); // a list request after the save
+  await s.context.close();
 });
