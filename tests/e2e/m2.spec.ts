@@ -6,18 +6,18 @@ import { ApiSession, operatorSession, setKnownPassword } from './helpers/api';
 // UI; the API helper only gives demo logins a known password for this run, looks up dates/ids,
 // and makes the direct FORBIDDEN calls. Passwords exist only in memory and are never printed.
 //
-// Dates are computed from the school's "today" (Asia/Kolkata):
-//   PAST  = the latest DAY-WISE student working day on or before today (attendance can't be
-//           future-dated; since M2X, Demo School is period-wise on 19 Oct 2026 — see the M2X report)
-//   START = the Monday of PAST's week — the date each run's Class 1 A timetable starts
-//   FUT   = the first working day after today (the timetable change of test 6 starts there)
+// Dates. Demo School's attendance mode history is fixed (M2X, m2x-m2.spec.ts): period-wise on
+// 19 Oct 2026 only, day-wise from 20 Oct 2026 on. The past dates are those fixed days, so a run
+// does the same thing whatever day it is (both were school days when the tests were written;
+// beforeAll checks they still are):
+//   PERIOD_DAY = 19 Oct 2026 — period marking (test 2)
+//   PAST       = 20 Oct 2026 — the day-wise day (day register, staff attendance, substitute, diary)
+//   START      = the Monday of PAST's week — the date each run's Class 1 A timetable starts
+//   FUT        = the next school day after today (student calendar) whose day a week later is a
+//                school day too (the timetable change of test 6 starts there; it checks both)
 // Class 1 A's plan is the same in every run: every weekday Period 1 Mathematics (Meera Rao) and
 // Period 2 English (Ravi Kumar). Class 1 B's active timetable (created once) has Meera Rao in
 // Monday Period 3 — the deliberate clash of test 1.
-//
-// Attendance mode: M2X set Demo School to period-wise on 19 Oct 2026 and back to day-wise from
-// 20 Oct (m2x-m2.spec.ts). Period marking (test 2) uses the latest period-wise working day on or
-// before today; it is skipped with a reason when there is none.
 
 const OPERATOR = process.env.E2E_OPERATOR_USERNAME ?? '';
 const OPERATOR_PASSWORD = process.env.E2E_OPERATOR_PASSWORD ?? '';
@@ -28,6 +28,8 @@ const DESKTOP = { width: 1280, height: 900 };
 const SECTION_A = 'Class 1 A';
 const SECTION_B = 'Class 1 B';
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const PERIOD_DAY = '2026-10-19';
+const DAILY_DAY = '2026-10-20';
 
 test.describe.configure({ mode: 'serial' });
 test.use({ trace: 'off', screenshot: 'off', video: 'off' });
@@ -55,7 +57,7 @@ function isoWeekday(iso: string) {
 // ------------------------------------------------------------------ shared state (memory only)
 const pw: Record<string, string> = {};
 let op: ApiSession;
-const D = { past: '', start: '', fut: '', periodDate: null as string | null };
+const D = { past: DAILY_DAY, start: '', fut: '', periodDate: PERIOD_DAY };
 const ids: Record<string, string> = {};
 const lessons: Record<string, number> = {};
 
@@ -77,29 +79,23 @@ test.beforeAll(async () => {
   pw.teacher = await setKnownPassword(op, 'demo.teacher');
   pw.parent = await setKnownPassword(op, 'demo.parent');
 
-  // working days from the student calendar of the current year
+  // working days from the student calendar of the current year: the fixed past days up to
+  // three weeks ahead (one call; get_calendar allows 400 days)
   const ctx = await op.rpc<{ current_year: { id: string } }>('get_context');
+  D.start = addDays(D.past, 1 - isoWeekday(D.past));
   const cal = await op.school<{ resolved: { date: string; weight: number }[] }>('get_calendar', {
     p_academic_year_id: ctx.current_year.id,
     p_audience: 'student',
-    p_from: addDays(TODAY, -14),
-    p_to: addDays(TODAY, 14),
+    p_from: D.start,
+    p_to: addDays(TODAY, 21),
   });
-  const working = cal.resolved.filter((d) => d.weight > 0).map((d) => d.date);
-  // (D.past is set below, once the attendance modes are known)
-  D.fut = working.find((d) => d > TODAY)!;
-  // a period-mode working day on or before today, if the school has one
-  const snap = await op.school<{ attendance_modes: { mode: string; effective_from: string }[] }>(
-    'get_setup_snapshot',
-  );
-  const modeOn = (d: string) =>
-    [...snap.attendance_modes]
-      .filter((m) => m.effective_from <= d)
-      .sort((a, b) => a.effective_from.localeCompare(b.effective_from))
-      .at(-1)?.mode ?? 'daily';
-  D.periodDate = working.filter((d) => d <= TODAY && modeOn(d) === 'period').at(-1) ?? null;
-  D.past = working.filter((d) => d <= TODAY && modeOn(d) === 'daily').at(-1)!;
-  D.start = addDays(D.past, 1 - isoWeekday(D.past));
+  const working = new Set(cal.resolved.filter((d) => d.weight > 0).map((d) => d.date));
+  for (const d of [D.periodDate, D.past]) {
+    if (!working.has(d)) throw new Error(`${d} is no longer a student working day in Demo School`);
+  }
+  const fut = [...working].sort().find((d) => d > TODAY && working.has(addDays(d, 7)));
+  if (!fut) throw new Error('No school day in the next two weeks with a school day a week later');
+  D.fut = fut;
 
   const sections = await op.school<{
     sections: { id: string; class_id: string; name: string }[];
@@ -274,8 +270,12 @@ test('1. Admin builds a timetable with a teacher clash (shown, fixed), activates
   await expect(page.getByTestId('cell-clash')).toHaveCount(0);
   await expect(page.getByTestId('conflict-count')).toHaveText('0');
 
-  // activate, then lessons from START (past days for marking) to two weeks ahead
-  const { dialog, result } = await activateAndUpdateLessons(page, D.start, addDays(TODAY, 13));
+  // activate, then lessons from START (past days for marking) to two weeks ahead — at most 63 days
+  // (the server's limit): later on, the range starts after START. Past lessons are never refreshed,
+  // and those of the fixed days exist since the first runs (marked, so always kept).
+  const to = addDays(TODAY, 13);
+  const from = [D.start, addDays(to, -62)].sort().at(-1)!;
+  const { dialog, result } = await activateAndUpdateLessons(page, from, to);
   await expect(result.getByTestId('result-created')).toBeVisible();
   await dialog.getByRole('button', { name: 'Close' }).last().click();
   await expect(page.getByText('Active', { exact: true }).first()).toBeVisible();
@@ -303,12 +303,8 @@ test('1. Admin builds a timetable with a teacher clash (shown, fixed), activates
 test('2. Teacher "Today": period attendance (mark all present + 2 exceptions); a second tab gets a conflict', async ({
   browser,
 }) => {
-  test.skip(
-    D.periodDate === null,
-    'No period-mode working day on or before today in Demo School (it is day-wise on every date).',
-  );
   test.setTimeout(240_000);
-  const date = D.periodDate!;
+  const date = D.periodDate;
   const { context, page } = await asTeacher(browser);
   await page.goto(`/dashboard?date=${date}`);
   const lesson = page.getByTestId('today-lesson').filter({ hasText: 'English' }).first();
@@ -540,13 +536,40 @@ test('6. Changing the timetable for future dates: unused lessons follow it, the 
   const futWeekday = WEEKDAYS[isoWeekday(D.fut) - 1]!;
   // homework on FUT's Period 2 lesson (set by Admin on the teacher's lesson)
   lessons.futP2 = await lessonIdOn(page, D.fut, SECTION_A, 'Period 2');
+  // evidence for the intermittent "set but not listed" failure (M2X run 2, M3 run 2): what the
+  // lesson page's list_homework calls answered, and what the page showed
+  const listed: string[] = [];
+  page.on('response', (r) => {
+    if (!r.url().endsWith('/rpc/list_homework') && !r.url().endsWith('/rpc/save_homework')) return;
+    void r.text().then(
+      (b) =>
+        listed.push(
+          `${new Date().toISOString()} ${r.url().split('/').at(-1)} ${r.status()} has run: ${b.includes(RUN)}`,
+        ),
+      () => listed.push(`${new Date().toISOString()} ${r.url().split('/').at(-1)} ${r.status()} (no body)`),
+    );
+  });
   await page.goto(`/lessons/${lessons.futP2}`);
   await page.getByRole('button', { name: 'Set homework' }).click();
   const d = modal(page);
   await d.getByLabel('Homework').fill(`Bring the reading log — ${RUN}`);
   await d.getByRole('button', { name: 'Set homework' }).click();
   await expect(d).toBeHidden({ timeout: 30_000 });
-  await expect(page.getByTestId('lesson-homework').filter({ hasText: RUN })).toBeVisible({ timeout: 30_000 });
+  try {
+    await expect(page.getByTestId('lesson-homework').filter({ hasText: RUN })).toBeVisible({
+      timeout: 30_000,
+    });
+  } catch (e) {
+    const shown = await page
+      .getByTestId('lesson-page')
+      .innerText()
+      .catch(() => '(no lesson page)');
+    await test.info().attach('homework not listed', {
+      body: `lesson ${lessons.futP2} on ${D.fut}\n${listed.join('\n')}\n--- page ---\n${shown}`,
+      contentType: 'text/plain',
+    });
+    throw e;
+  }
 
   // a new version from FUT: Period 2 on FUT's weekday becomes Science (same teacher)
   await page.goto(`/timetable?section=${ids[SECTION_A]}`);
