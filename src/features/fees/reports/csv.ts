@@ -1,30 +1,11 @@
 import type { CollectionRow, DuesRow } from '@/contracts/fees';
+import { toCsv } from '@/lib/csv';
 import { paiseToCsvRupees } from '@/lib/money';
 import { METHOD_LABELS } from '../labels';
 
-// Client-side CSV of the day book and dues (brief §8): built from the RPC rows only, amounts as
-// rupees with 2 decimals ("4500.50"), never floats. Text cells that a spreadsheet would run as a
-// formula (=, +, -, @) are prefixed with an apostrophe.
+// Day book and dues CSV (brief §8); the cell rules live in @/lib/csv.
 
-type Cell = string | number | null;
-
-function cell(v: Cell, isAmount = false): string {
-  if (v === null) return '';
-  let s = String(v);
-  if (!isAmount && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
-  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
-
-/** CSV text (CRLF line ends, as spreadsheets expect). `amountCols` are left unescaped numbers. */
-export function toCsv(
-  headers: string[],
-  rows: Cell[][],
-  amountCols: ReadonlySet<number> = new Set(),
-): string {
-  const lines = [headers.map((h) => cell(h)).join(',')];
-  for (const r of rows) lines.push(r.map((v, i) => cell(v, amountCols.has(i))).join(','));
-  return lines.join('\r\n') + '\r\n';
-}
+export { toCsv };
 
 export function dayBookCsv(rows: CollectionRow[]): string {
   return toCsv(

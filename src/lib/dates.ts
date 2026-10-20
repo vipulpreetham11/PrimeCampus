@@ -158,6 +158,22 @@ export function minDate(a: IsoDate, b: IsoDate): IsoDate {
   return compareIsoDates(a, b) <= 0 ? a : b;
 }
 
+const MONTH_PARAM = /^(\d{4})-(\d{2})$/;
+
+/** URL "?month=2026-09" → "2026-09-01" (what the month RPCs take), or null when invalid. */
+export function parseMonthParam(raw: string | null): IsoDate | null {
+  if (!raw) return null;
+  const m = MONTH_PARAM.exec(raw);
+  if (!m) return null;
+  const mo = Number(m[2]);
+  return mo >= 1 && mo <= 12 ? `${m[1]}-${m[2]}-01` : null;
+}
+
+/** "2026-09-01" → "2026-09" for the URL. */
+export function monthParam(month: IsoDate): string {
+  return month.slice(0, 7);
+}
+
 const WEEKDAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 const WEEKDAY_LONG = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const;
 
