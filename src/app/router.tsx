@@ -254,6 +254,61 @@ const attendanceOverviewRoutes: RouteObject = guarded(
   ],
 );
 
+// M4 reports: the register is also open to class teachers (lessons.teach; the server decides
+// which sections), the change trail has a student and a staff tab.
+const reportRoutes: RouteObject = {
+  children: [
+    guarded(
+      ['attendance.read_all', 'lessons.teach'],
+      [
+        {
+          path: '/attendance/register',
+          lazy: () =>
+            import('@/features/attendance/register/RegisterPage').then((m) => ({
+              Component: m.RegisterPage,
+            })),
+        },
+      ],
+    ),
+    guarded(
+      ['attendance.read_all', 'staff_attendance.read'],
+      [
+        {
+          path: '/attendance/changes',
+          lazy: () =>
+            import('@/features/attendance/register/ChangesPage').then((m) => ({
+              Component: m.AttendanceChangesPage,
+            })),
+        },
+      ],
+    ),
+    guarded(
+      ['academic.read_all'],
+      [
+        {
+          path: '/reports/coverage',
+          lazy: () => import('@/features/reports/CoveragePage').then((m) => ({ Component: m.CoveragePage })),
+        },
+      ],
+    ),
+  ],
+};
+
+// Salary (M4): confidential, staff_finance.read; the calculator's actions need staff_finance.manage.
+const salaryRoutes: RouteObject = guarded(
+  ['staff_finance.read'],
+  [
+    {
+      path: '/salary',
+      lazy: () => import('@/features/salary/SalaryMonthPage').then((m) => ({ Component: m.SalaryMonthPage })),
+    },
+    {
+      path: '/salary/:staffId',
+      lazy: () => import('@/features/salary/SalaryStaffPage').then((m) => ({ Component: m.SalaryStaffPage })),
+    },
+  ],
+);
+
 const staffAttendanceRoutes: RouteObject = guarded(
   ['staff_attendance.read'],
   [
@@ -333,6 +388,10 @@ const feeRoutes: RouteObject = guarded(
             import('@/features/fees/reports/CollectionReportPage').then((m) => ({
               Component: m.CollectionReportPage,
             })),
+        },
+        {
+          path: '/fees/reports/heads',
+          lazy: () => import('@/features/reports/FeeHeadsPage').then((m) => ({ Component: m.FeeHeadsPage })),
         },
         {
           path: '/fees/dues',
@@ -422,8 +481,29 @@ export const router = createBrowserRouter([
           academicRoutes,
           attendanceOverviewRoutes,
           staffAttendanceRoutes,
+          reportRoutes,
+          salaryRoutes,
           childRoutes,
           feeRoutes,
+          {
+            path: '/operator/activity',
+            lazy: () =>
+              import('@/features/operator/ConsolePages').then((m) => ({ Component: m.ActivityLogPage })),
+          },
+          {
+            path: '/operator/sign-ins',
+            lazy: () =>
+              import('@/features/operator/ConsolePages').then((m) => ({ Component: m.SignInsPage })),
+          },
+          {
+            path: '/operator/usage',
+            lazy: () => import('@/features/operator/ConsolePages').then((m) => ({ Component: m.UsagePage })),
+          },
+          {
+            path: '/operator/maintenance',
+            lazy: () =>
+              import('@/features/operator/ConsolePages').then((m) => ({ Component: m.MaintenancePage })),
+          },
           {
             path: '/operator/onboarding',
             lazy: () =>

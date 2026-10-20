@@ -26,4 +26,7 @@ export function scopedKey(scope: ContextScope, feature: string, ...params: unkno
 /** Keys for account-level (no school context) queries, e.g. the Operator's school list. */
 export const accountKeys = {
   operatorSchools: (accountId: string) => ['account', accountId, 'operator', 'schools'] as const,
+  /** Operator console reads (M4): audit / auth events, usage, maintenance. */
+  operator: (accountId: string, ...params: unknown[]) =>
+    ['account', accountId, 'operator', ...params] as const,
 };

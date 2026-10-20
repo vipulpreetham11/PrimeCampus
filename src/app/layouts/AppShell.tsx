@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router';
 import {
   ArrowLeftRight,
+  BarChart3,
   BookOpen,
   Briefcase,
   CalendarClock,
@@ -19,6 +20,8 @@ import {
   LogOut,
   IndianRupee,
   Menu,
+  ScrollText,
+  Wallet,
   School,
   Settings,
   UserRound,
@@ -61,6 +64,9 @@ const ICONS: Record<NavIcon, LucideIcon> = {
   homework: BookOpen,
   'staff-attendance': UserCheck,
   fees: IndianRupee,
+  salary: Wallet,
+  reports: BarChart3,
+  logs: ScrollText,
 };
 
 function NavIconView({ icon, className }: { icon: NavIcon; className: string }) {
