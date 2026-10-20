@@ -17,6 +17,7 @@ import {
   KeyRound,
   LayoutDashboard,
   LogOut,
+  IndianRupee,
   Menu,
   School,
   Settings,
@@ -59,6 +60,7 @@ const ICONS: Record<NavIcon, LucideIcon> = {
   diary: NotebookPen,
   homework: BookOpen,
   'staff-attendance': UserCheck,
+  fees: IndianRupee,
 };
 
 function NavIconView({ icon, className }: { icon: NavIcon; className: string }) {

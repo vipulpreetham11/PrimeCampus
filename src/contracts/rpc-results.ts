@@ -108,6 +108,43 @@ import {
   studentDiaryItemSchema,
   studentHomeworkItemSchema,
 } from './academic';
+import {
+  adjustmentSavedSchema,
+  chequeBouncedSchema,
+  chequeCancelledSchema,
+  chequeClearedSchema,
+  chequePageSchema,
+  chequeRecordedSchema,
+  collectionPageSchema,
+  collectionPostedSchema,
+  collectionReportSchema,
+  collectionReversedSchema,
+  concessionGrantedSchema,
+  concessionPresetSavedSchema,
+  concessionRevokedSchema,
+  duesRowSchema,
+  exceptionPageSchema,
+  exceptionRecordedSchema,
+  exceptionResolvedSchema,
+  feeHeadSavedSchema,
+  feeSetupSchema,
+  feeStructureSavedSchema,
+  feeStudentSchema,
+  feeTermSavedSchema,
+  invoiceCancelledSchema,
+  lateFeeRuleRetiredSchema,
+  lateFeeRuleSavedSchema,
+  lateFeesEvaluatedSchema,
+  openingBalanceIssuedSchema,
+  optionalFeesSavedSchema,
+  optionalRosterRowSchema,
+  previewRowSchema,
+  receiptSchema,
+  receivingAccountSavedSchema,
+  statementSchema,
+  studentConcessionPageSchema,
+  termIssuedSchema,
+} from './fees';
 
 // Response schemas per RPC. The RPC layer validates a response when its function is listed
 // here; otherwise the generated `Json` type is returned. Feature modules add their DTOs here
@@ -225,6 +262,50 @@ export const RPC_RESULT_SCHEMAS = {
   get_homework_roster: homeworkRosterSchema,
   mark_homework_checks: homeworkChecksSavedSchema,
   get_student_homework: z.array(studentHomeworkItemSchema),
+
+  // M3 — fees: setup
+  get_fee_setup: feeSetupSchema,
+  save_fee_head: feeHeadSavedSchema,
+  save_receiving_account: receivingAccountSavedSchema,
+  save_fee_term: feeTermSavedSchema,
+  save_fee_structure: feeStructureSavedSchema,
+  save_concession_preset: concessionPresetSavedSchema,
+  save_late_fee_rule: lateFeeRuleSavedSchema,
+  retire_late_fee_rule: lateFeeRuleRetiredSchema,
+  list_optional_fee_roster: z.array(optionalRosterRowSchema),
+  set_optional_fees: optionalFeesSavedSchema,
+
+  // M3 — fees: concessions and invoicing
+  list_student_concessions: studentConcessionPageSchema,
+  grant_concession: concessionGrantedSchema,
+  revoke_concession: concessionRevokedSchema,
+  preview_term_invoices: z.array(previewRowSchema),
+  issue_term_invoices: termIssuedSchema,
+  issue_opening_balance: openingBalanceIssuedSchema,
+  add_invoice_adjustment: adjustmentSavedSchema,
+  evaluate_late_fees: lateFeesEvaluatedSchema,
+  waive_late_fee: adjustmentSavedSchema,
+  cancel_invoice: invoiceCancelledSchema,
+
+  // M3 — fees: money in / out
+  post_collection: collectionPostedSchema,
+  record_cheque: chequeRecordedSchema,
+  reverse_collection: collectionReversedSchema,
+  clear_cheque: chequeClearedSchema,
+  bounce_cheque: chequeBouncedSchema,
+  cancel_cheque: chequeCancelledSchema,
+  record_payment_exception: exceptionRecordedSchema,
+  resolve_payment_exception: exceptionResolvedSchema,
+
+  // M3 — fees: reads and reports
+  get_student_statement: statementSchema,
+  get_receipt: receiptSchema,
+  list_cheques: chequePageSchema,
+  list_payment_exceptions: exceptionPageSchema,
+  list_collections: collectionPageSchema,
+  get_collection_report: collectionReportSchema,
+  get_dues_report: z.array(duesRowSchema),
+  search_fee_students: z.array(feeStudentSchema),
 } satisfies Record<string, z.ZodType>;
 
 export type RpcWithSchema = keyof typeof RPC_RESULT_SCHEMAS;

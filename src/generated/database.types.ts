@@ -368,7 +368,7 @@ export type Database = {
           p_academic_year_id: string
           p_amount_paise: number
           p_ctx_rev: number
-          p_due_date: string
+          p_due_date?: string
           p_fee_head_id: string
           p_origin_label: string
           p_source_ref: string
@@ -631,6 +631,7 @@ export type Database = {
       post_collection: {
         Args: {
           p_allocations: Json
+          p_allow_possible_duplicate?: boolean
           p_amount_paise: number
           p_ctx_rev: number
           p_external_ref?: string
@@ -1027,6 +1028,10 @@ export type Database = {
           p_section_id: string
           p_version_id?: string
         }
+        Returns: Json
+      }
+      search_fee_students: {
+        Args: { p_ctx_rev: number; p_limit?: number; p_q: string }
         Returns: Json
       }
       search_guardians: {

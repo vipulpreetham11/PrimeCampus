@@ -38,6 +38,13 @@ export const DATASETS: Record<ImportDataset, DatasetInfo> = {
     commitCapability: 'students.manage',
     identifyingKeys: ['admission_no', 'class_name', 'section_name', 'roll_no'],
   },
+  opening_balances: {
+    label: 'Opening balances (fees)',
+    description:
+      'Money students owed before PrimeCampus, one row per student and fee head. Students and fee heads must exist first.',
+    commitCapability: 'fees.manage',
+    identifyingKeys: ['admission_no', 'fee_head_code', 'amount', 'source_ref'],
+  },
 };
 
 export const DATASET_ORDER: ImportDataset[] = [
@@ -45,6 +52,7 @@ export const DATASET_ORDER: ImportDataset[] = [
   'staff',
   'students_guardians',
   'placements',
+  'opening_balances',
 ];
 
 export function datasetLabel(d: string): string {

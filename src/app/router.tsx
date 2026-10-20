@@ -267,6 +267,87 @@ const staffAttendanceRoutes: RouteObject = guarded(
   ],
 );
 
+// Fees (M3): every fee page needs fees.read; collecting and invoicing need fees.manage.
+const feeRoutes: RouteObject = guarded(
+  ['fees.read'],
+  [
+    {
+      lazy: () => import('@/features/fees/parts').then((m) => ({ Component: m.FeesLayout })),
+      children: [
+        {
+          path: '/fees',
+          lazy: () => import('@/features/fees/parts').then((m) => ({ Component: m.FeesIndex })),
+        },
+        guarded(
+          ['fees.manage'],
+          [
+            {
+              path: '/fees/collect',
+              lazy: () =>
+                import('@/features/fees/collect/CollectPage').then((m) => ({ Component: m.CollectPage })),
+            },
+            {
+              path: '/fees/invoices',
+              lazy: () =>
+                import('@/features/fees/invoices/InvoicesPage').then((m) => ({ Component: m.InvoicesPage })),
+            },
+          ],
+        ),
+        {
+          path: '/fees/students/:studentId',
+          lazy: () =>
+            import('@/features/fees/statement/StatementPage').then((m) => ({ Component: m.StatementPage })),
+        },
+        {
+          path: '/fees/receipts/:receiptId',
+          lazy: () =>
+            import('@/features/fees/receipts/ReceiptPage').then((m) => ({ Component: m.ReceiptPage })),
+        },
+        {
+          path: '/fees/cheques',
+          lazy: () =>
+            import('@/features/fees/corrections/ChequesPage').then((m) => ({ Component: m.ChequesPage })),
+        },
+        {
+          path: '/fees/exceptions',
+          lazy: () =>
+            import('@/features/fees/corrections/ExceptionsPage').then((m) => ({
+              Component: m.ExceptionsPage,
+            })),
+        },
+        {
+          path: '/fees/concessions',
+          lazy: () =>
+            import('@/features/fees/corrections/ConcessionsPage').then((m) => ({
+              Component: m.ConcessionsPage,
+            })),
+        },
+        {
+          path: '/fees/day-book',
+          lazy: () =>
+            import('@/features/fees/reports/DayBookPage').then((m) => ({ Component: m.DayBookPage })),
+        },
+        {
+          path: '/fees/reports',
+          lazy: () =>
+            import('@/features/fees/reports/CollectionReportPage').then((m) => ({
+              Component: m.CollectionReportPage,
+            })),
+        },
+        {
+          path: '/fees/dues',
+          lazy: () => import('@/features/fees/reports/DuesPage').then((m) => ({ Component: m.DuesPage })),
+        },
+        {
+          path: '/fees/setup',
+          lazy: () =>
+            import('@/features/fees/setup/FeeSetupPage').then((m) => ({ Component: m.FeeSetupPage })),
+        },
+      ],
+    },
+  ],
+);
+
 const childRoutes: RouteObject = guarded(
   ['child.view'],
   [
@@ -286,6 +367,14 @@ const childRoutes: RouteObject = guarded(
     {
       path: '/child/homework',
       lazy: () => import('@/features/child/ChildPages').then((m) => ({ Component: m.ChildHomeworkPage })),
+    },
+    {
+      path: '/child/fees',
+      lazy: () => import('@/features/fees/ChildFees').then((m) => ({ Component: m.ChildFeesPage })),
+    },
+    {
+      path: '/child/fees/receipts/:receiptId',
+      lazy: () => import('@/features/fees/ChildFees').then((m) => ({ Component: m.ChildReceiptPage })),
     },
   ],
 );
@@ -334,6 +423,7 @@ export const router = createBrowserRouter([
           attendanceOverviewRoutes,
           staffAttendanceRoutes,
           childRoutes,
+          feeRoutes,
           {
             path: '/operator/onboarding',
             lazy: () =>

@@ -259,6 +259,8 @@ export const saveTeachingAssignment = (args: SchoolArgs<'save_teaching_assignmen
   schoolRpc('save_teaching_assignment', args, options);
 export const saveTimetableDraft = (args: SchoolArgs<'save_timetable_draft'>, options?: RpcOptions) =>
   schoolRpc('save_timetable_draft', args, options);
+export const searchFeeStudents = (args: SchoolArgs<'search_fee_students'>, options?: RpcOptions) =>
+  schoolRpc('search_fee_students', args, options);
 export const searchGuardians = (args: SchoolArgs<'search_guardians'>, options?: RpcOptions) =>
   schoolRpc('search_guardians', args, options);
 export const selectContext = (args: RpcArgs<'select_context'> = {}, options?: RpcOptions) =>
@@ -290,7 +292,7 @@ export const updateStudent = (args: SchoolArgs<'update_student'>, options?: RpcO
 export const waiveLateFee = (args: SchoolArgs<'waive_late_fee'>, options?: RpcOptions) =>
   schoolRpc('waive_late_fee', args, options);
 
-/** RPCs that take p_ctx_rev (126). */
+/** RPCs that take p_ctx_rev (127). */
 export const SCHOOL_RPCS = [
   'activate_timetable',
   'add_invoice_adjustment',
@@ -404,6 +406,7 @@ export const SCHOOL_RPCS = [
   'save_subject',
   'save_teaching_assignment',
   'save_timetable_draft',
+  'search_fee_students',
   'search_guardians',
   'set_admissions_duty',
   'set_attendance_mode',

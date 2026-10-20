@@ -22,24 +22,22 @@ const PLACEHOLDERS: Record<Role, Placeholder> = {
   operator: {
     title: 'Operator overview',
     module: 'M4',
-    upcoming: [
-      { label: 'Fees and receipts', module: 'M3' },
-      { label: 'Activity, authentication and usage logs', module: 'M4' },
-    ],
+    upcoming: [{ label: 'Activity, authentication and usage logs', module: 'M4' }],
   },
   admin: {
     title: 'Admin operations dashboard',
     module: 'M4',
-    upcoming: [
-      { label: 'Fees configuration, invoices, collections and receipts', module: 'M3' },
-      { label: 'Salary calculator and operations dashboard', module: 'M4' },
-    ],
+    upcoming: [{ label: 'Salary calculator and operations dashboard', module: 'M4' }],
   },
   accountant: {
-    title: 'Fees dashboard',
-    module: 'M3',
+    title: 'Accountant fees dashboard',
+    module: 'M4',
     upcoming: [
-      { label: 'Fees configuration, invoices, collections, receipts and fee reports', module: 'M3' },
+      {
+        label:
+          'Collections, dues, concessions, cheque status and reversals at a glance (the fee screens are live under Fees)',
+        module: 'M4',
+      },
     ],
   },
   principal: {
@@ -50,10 +48,7 @@ const PLACEHOLDERS: Record<Role, Placeholder> = {
   owner: {
     title: 'Owner management dashboard',
     module: 'M4',
-    upcoming: [
-      { label: 'Fee reports', module: 'M3' },
-      { label: 'Staff attendance and salary', module: 'M4' },
-    ],
+    upcoming: [{ label: 'Staff attendance and salary', module: 'M4' }],
   },
   teacher: {
     title: 'Teacher Today',
@@ -63,18 +58,12 @@ const PLACEHOLDERS: Record<Role, Placeholder> = {
   parent: {
     title: 'Child overview',
     module: 'M2',
-    upcoming: [
-      { label: 'Timetable, attendance, diary and homework', module: 'M2' },
-      { label: 'Fees and receipts', module: 'M3' },
-    ],
+    upcoming: [{ label: 'Timetable, attendance, diary and homework', module: 'M2' }],
   },
   student: {
     title: 'My overview',
     module: 'M2',
-    upcoming: [
-      { label: 'Timetable, attendance, diary and homework', module: 'M2' },
-      { label: 'Fees and receipts', module: 'M3' },
-    ],
+    upcoming: [{ label: 'Timetable, attendance, diary and homework', module: 'M2' }],
   },
 };
 
