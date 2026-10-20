@@ -104,7 +104,6 @@ export function liveSummary(overrides: Record<string, unknown> = {}) {
     needs_manual_resolution: false,
     resolution_reason: null,
     unmarked_count: 2,
-    discrepancy_count: 1,
     ...overrides,
   };
 }

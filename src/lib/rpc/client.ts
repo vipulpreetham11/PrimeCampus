@@ -43,8 +43,8 @@ function combine(a: AbortSignal, b?: AbortSignal): AbortSignal {
   return c.signal;
 }
 
-function fail(error: AppError, silent = false): never {
-  if (!silent && error.code !== 'CANCELLED') reportGlobalError(error);
+function fail(error: AppError, silent = false, source?: string): never {
+  if (!silent && error.code !== 'CANCELLED') reportGlobalError(error, source);
   throw error;
 }
 
@@ -66,21 +66,21 @@ export async function callRpc<F extends BrowserRpc>(
     const builder = args === undefined ? rpc(fn) : rpc(fn, args as Record<string, unknown>);
     response = await builder.abortSignal(signal);
   } catch (e) {
-    return fail(toAppError(e, requestId), options.silent);
+    return fail(toAppError(e, requestId), options.silent, fn);
   }
 
   // An old context's response must never populate the new view (TRD §7.1).
   if (!options.detached && sessionStore.get().epoch !== epoch) {
     throw new AppError('CANCELLED', 'The request was cancelled.', requestId);
   }
-  if (response.error) return fail(toAppError(response.error, requestId), options.silent);
+  if (response.error) return fail(toAppError(response.error, requestId), options.silent, fn);
 
   const schema = (RPC_RESULT_SCHEMAS as Record<string, z.ZodType>)[fn];
   if (!schema) return response.data as RpcResult<F>;
   const parsed = schema.safeParse(response.data);
   if (!parsed.success) {
     if (import.meta.env.DEV) console.error(`[rpc] ${fn} returned an unexpected shape`, parsed.error.issues);
-    return fail(new AppError('UNKNOWN', 'Something went wrong.', requestId), options.silent);
+    return fail(new AppError('UNKNOWN', 'Something went wrong.', requestId), options.silent, fn);
   }
   return parsed.data as RpcResult<F>;
 }

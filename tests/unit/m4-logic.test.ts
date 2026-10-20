@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildNav } from '@/app/navigation';
 import { attendanceRegisterSchema } from '@/contracts/reports';
-import { salaryMonthSchema } from '@/contracts/salary';
+import { salaryMonthSchema, salarySavedSchema } from '@/contracts/salary';
 import { contextSchema } from '@/contracts/session';
 import { feeHeadReportSchema } from '@/contracts/reports';
 import { dashboardLinks, groupSetupIssues, setupIssueLink } from '@/features/dashboard/links';
@@ -24,6 +24,7 @@ import {
   sortCoverage,
 } from '@/features/reports/logic';
 import {
+  applySavedToMonth,
   buildOverrides,
   deductionPaise,
   defaultSalaryMonth,
@@ -185,6 +186,57 @@ describe('salary override validation', () => {
       p_overrides: { working_days: 21 },
       p_override_reason: 'r',
     });
+  });
+});
+
+describe('the month right after a save (cache patch)', () => {
+  const month = salaryMonthSchema.parse(
+    salaryMonth(
+      [
+        monthRow({ status: 'changed', saved: savedSnapshot() }),
+        monthRow({ staff_id: M4.staff2, name: 'Lata Iyer', status: 'not_saved' }),
+      ],
+      true,
+      { saved: 1, changed: 1, not_saved: 1, saved_payable_paise: 3_200_000 },
+    ),
+  );
+  const result = salarySavedSchema.parse({
+    ...computation({ attended_days: 16, payable_paise: 3_400_000, overrides: { attended_days: 16 } }),
+    salary_calculation_id: M4.calc2,
+    version_no: 2,
+  });
+  it('a new version: that row is "Saved v2" with the saved numbers; totals follow', () => {
+    const m = applySavedToMonth(month, M4.staff, result, 'Fixed', 'Demo Admin', '2026-10-21T05:00:00.000Z');
+    const row = m.rows[0]!;
+    expect(row.status).toBe('saved');
+    expect(row.saved).toMatchObject({
+      version_no: 2,
+      payable_paise: 3_400_000,
+      attended_days: 16,
+      override_reason: 'Fixed',
+      calculated_by: 'Demo Admin',
+    });
+    expect(m.totals).toMatchObject({ saved: 1, changed: 0, not_saved: 1, saved_payable_paise: 3_400_000 });
+    expect(m.rows[1]).toBe(month.rows[1]);
+  });
+  it('a replay keeps the saved version’s own time, author and reason; another month is untouched', () => {
+    const saved = applySavedToMonth(
+      month,
+      M4.staff,
+      { ...result, version_no: 1, replayed: true },
+      'x',
+      'y',
+      'now',
+    );
+    expect(saved.rows[0]!.saved).toMatchObject({
+      version_no: 1,
+      created_at: '2026-10-01T05:00:00+00:00',
+      calculated_by: 'Demo Admin',
+      override_reason: null,
+    });
+    expect(applySavedToMonth(month, M4.staff, { ...result, month: '2026-08-01' }, null, null, 'now')).toBe(
+      month,
+    );
   });
 });
 

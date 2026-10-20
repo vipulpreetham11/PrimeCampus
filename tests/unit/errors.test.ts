@@ -79,6 +79,15 @@ describe('toAppError — PostgREST hint mapping (CLAUDE.md rule 3)', () => {
     expect(toAppError({ hint: 'DROP TABLE', message: 'x' }).code).toBe('UNKNOWN');
   });
 
+  it('a database too busy (statement / pool timeout) is TEMPORARILY_UNAVAILABLE: retried once for reads, never SQL', () => {
+    for (const code of ['57014', 'PGRST003']) {
+      const e = toAppError({ code, message: 'canceling statement due to statement timeout' }, 'r');
+      expect(e.code).toBe('TEMPORARILY_UNAVAILABLE');
+      expect(e.message).not.toMatch(/statement/);
+      expect(isTransient(e)).toBe(true);
+    }
+  });
+
   it('maps expired JWTs to UNAUTHENTICATED', () => {
     expect(toAppError({ code: 'PGRST301', message: 'JWT expired' }).code).toBe('UNAUTHENTICATED');
   });

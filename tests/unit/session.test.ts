@@ -311,3 +311,52 @@ describe('app session ended by the server (M4: idle 30 days → daily clean-up)'
     expect(redirectFor('signed_out', '/dashboard', false)).toBe('/sign-in');
   });
 });
+
+describe('Operator RPC refused after the session ended (M4 review)', () => {
+  const forbidden = { error: { code: 'P0001', hint: 'FORBIDDEN', message: 'Operator access required' } };
+
+  it('FORBIDDEN from op_* re-checks the session: ended → sign-in with the message', async () => {
+    sessionStore.set({
+      status: 'choosing',
+      account: { accountId: ids.account, username: 'op', displayName: 'Op', isOperator: true },
+    });
+    onRpc((fn) => {
+      if (fn === 'op_get_maintenance') return forbidden;
+      if (fn === 'bootstrap_account')
+        return {
+          error: {
+            code: 'P0001',
+            hint: 'UNAUTHENTICATED',
+            message: 'This session has ended. Sign in again.',
+          },
+        };
+      return { data: null };
+    });
+    await expect(rpc.opGetMaintenance()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await waitFor(() => sessionStore.get().status === 'signed_out');
+    expect(sessionStore.get().notice?.message).toBe('Your session has ended. Please sign in again.');
+    expect(fakeSupabase.auth.signOut).toHaveBeenCalledWith({ scope: 'local' });
+  });
+
+  it('a live session keeps the refusal (grant revoked) and refreshes the Operator flag; school FORBIDDEN never re-checks', async () => {
+    sessionStore.set({
+      status: 'choosing',
+      account: { accountId: ids.account, username: 'op', displayName: 'Op', isOperator: true },
+    });
+    onRpc((fn) => {
+      if (fn === 'op_get_maintenance') return forbidden;
+      if (fn === 'bootstrap_account') return { data: bootstrapRow({ is_operator: false }) };
+      return { data: null };
+    });
+    await expect(rpc.opGetMaintenance()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await waitFor(() => sessionStore.get().account?.isOperator === false);
+    expect(sessionStore.get().status).toBe('choosing');
+
+    rpcCalls.length = 0;
+    sessionStore.set({ status: 'ready', context: contextSchema.parse(contextRow(2)) });
+    onRpc((fn) => (fn === 'get_setup_snapshot' ? forbidden : { data: null }));
+    await expect(rpc.getSetupSnapshot({})).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await flush();
+    expect(rpcCalls.filter((c) => c.fn === 'bootstrap_account')).toHaveLength(0);
+  });
+});

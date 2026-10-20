@@ -92,7 +92,8 @@ export const liveSummarySchema = z.object({
   needs_manual_resolution: z.boolean(),
   resolution_reason: z.string().nullable(),
   unmarked_count: z.number().int(),
-  discrepancy_count: z.number().int(),
+  /** 2400/2410 only; 2420 (set-based month) no longer sends it. */
+  discrepancy_count: z.number().int().optional(),
 });
 export type LiveSummary = z.infer<typeof liveSummarySchema>;
 

@@ -146,6 +146,12 @@ export function toAppError(err: unknown, requestId: string = newRequestId(), ser
   // Some invoker RPCs let table constraints raise directly (no hint). Map the SQLSTATE class to a
   // safe, fixed message; the database text itself is never shown.
   const sqlState = typeof e.code === 'string' ? e.code : '';
+  // The database or its pool was too busy (statement timeout 57014, PGRST003 pool timeout): transient,
+  // so a read is retried once and a save counts as "not confirmed" (M4: seen live under load; as
+  // UNKNOWN a failed refetch left a list on its error panel until Try again).
+  if (sqlState === '57014' || sqlState === 'PGRST003') {
+    return new AppError('TEMPORARILY_UNAVAILABLE', SAFE_MESSAGES.TEMPORARILY_UNAVAILABLE, requestId);
+  }
   const constraintMessage = CONSTRAINT_MESSAGES[sqlState];
   if (constraintMessage) return new AppError(constraintMessage[0], constraintMessage[1], requestId);
 
@@ -161,18 +167,21 @@ export function toAppError(err: unknown, requestId: string = newRequestId(), ser
 // Global handlers. The session layer registers these once; the RPC/Edge layers
 // call `reportGlobalError` for every failure so UNAUTHENTICATED and STALE_CONTEXT
 // are handled the same way everywhere.
-type Handler = (error: AppError) => void;
-const handlers: Partial<Record<'UNAUTHENTICATED' | 'STALE_CONTEXT', Handler>> = {};
+// FORBIDDEN goes to its handler too, with the failing function's name: the Operator RPCs answer
+// FORBIDDEN (not UNAUTHENTICATED) when the app session has ended, so the session layer re-checks
+// the session for them instead of leaving a "no access" page up (M4 review).
+type Handler = (error: AppError, source?: string) => void;
+type GlobalCode = 'UNAUTHENTICATED' | 'STALE_CONTEXT' | 'FORBIDDEN';
+const handlers: Partial<Record<GlobalCode, Handler>> = {};
 
-export function setGlobalErrorHandler(
-  code: 'UNAUTHENTICATED' | 'STALE_CONTEXT',
-  handler: Handler | undefined,
-) {
+export function setGlobalErrorHandler(code: GlobalCode, handler: Handler | undefined) {
   handlers[code] = handler;
 }
 
-export function reportGlobalError(error: AppError): void {
-  if (error.code === 'UNAUTHENTICATED' || error.code === 'STALE_CONTEXT') handlers[error.code]?.(error);
+/** `source`: the RPC (or Edge action) that failed, when known. */
+export function reportGlobalError(error: AppError, source?: string): void {
+  if (error.code === 'UNAUTHENTICATED' || error.code === 'STALE_CONTEXT' || error.code === 'FORBIDDEN')
+    handlers[error.code]?.(error, source);
 }
 
 /** Retry policy for reads (TRD §17): transient failures only, never permission/validation/conflict. */

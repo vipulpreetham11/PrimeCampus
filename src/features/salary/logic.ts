@@ -1,5 +1,6 @@
 import type {
   OverrideKey,
+  SalarySaved,
   SalaryComputation,
   SalaryMonth,
   SalaryMonthRow,
@@ -217,6 +218,64 @@ export function sameOverrides(a: SalaryOverrides, b: SalaryOverrides): boolean {
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]) as Set<OverrideKey>;
   for (const k of keys) if (a[k] !== b[k]) return false;
   return true;
+}
+
+// ------------------------------------------------------------------ after a save
+
+/**
+ * The month view right after a save (or a replay) of `staffId`: that row is "Saved vN" with the
+ * numbers just saved, and the totals follow. Applied to the cached month before the refetch, so the
+ * screen never shows the old "Changed since saved" while the server is asked again (M4 review).
+ * A replay keeps the saved version's own time and author; a new version shows `now` / `who` until
+ * the refetch brings the server's.
+ */
+export function applySavedToMonth(
+  data: SalaryMonth,
+  staffId: string,
+  r: SalarySaved,
+  reason: string | null,
+  who: string | null,
+  now: string,
+): SalaryMonth {
+  if (data.month !== r.month) return data;
+  let found = false;
+  const rows = data.rows.map((row): SalaryMonthRow => {
+    if (row.staff_id !== staffId || r.payable_paise === null || r.monthly_salary_paise === null) return row;
+    found = true;
+    const keep = r.replayed && row.saved?.version_no === r.version_no ? row.saved : null;
+    return {
+      ...row,
+      status: 'saved',
+      saved: {
+        id: r.salary_calculation_id,
+        version_no: r.version_no,
+        monthly_salary_paise: r.monthly_salary_paise,
+        working_days: r.working_days,
+        attended_days: r.attended_days,
+        paid_leave_days: r.paid_leave_days,
+        unpaid_days: Math.max(r.unpaid_days, 0),
+        payable_paise: r.payable_paise,
+        overrides: r.overrides,
+        override_reason: keep ? keep.override_reason : reason,
+        created_at: keep?.created_at ?? now,
+        calculated_by: keep?.calculated_by ?? who,
+      },
+    };
+  });
+  if (!found) return data;
+  const count = (s: SalaryStatus) => rows.filter((x) => x.status === s).length;
+  return {
+    ...data,
+    rows,
+    totals: {
+      ...data.totals,
+      saved: count('saved') + count('changed'),
+      changed: count('changed'),
+      needs_resolution: count('needs_resolution'),
+      not_saved: count('not_saved'),
+      saved_payable_paise: rows.reduce((t, x) => t + (x.saved?.payable_paise ?? 0), 0),
+    },
+  };
 }
 
 // ------------------------------------------------------------------ export

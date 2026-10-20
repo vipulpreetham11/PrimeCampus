@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { SalaryOverrides } from '@/contracts/salary';
+import type { SalaryMonth, SalaryOverrides } from '@/contracts/salary';
 import { monthEnd } from '@/lib/dates';
 import {
   cancelPaidLeave,
@@ -11,6 +11,8 @@ import {
   saveSalaryCalculation,
 } from '@/lib/rpc';
 import { useScopedKey } from '@/lib/scope';
+import { useSessionSelector } from '@/lib/session/store';
+import { applySavedToMonth } from './logic';
 
 // Salary (SAL-01). Confidential: every query lives under its own 'salary-*' key in the
 // context-scoped, memory-only cache, and the server returns nothing to roles without
@@ -99,8 +101,16 @@ export function saveSalaryArgs(v: SaveSalaryInput) {
  */
 export function useSaveSalary() {
   const invalidate = useInvalidateSalary();
+  const key = useScopedKey();
+  const qc = useQueryClient();
+  const who = useSessionSelector((st) => st.account?.displayName ?? null);
   return useMutation({
     mutationFn: (v: SaveSalaryInput) => saveSalaryCalculation(saveSalaryArgs(v)),
+    // the cached month shows "Saved vN" at once (never the old "Changed since saved"); then refetch
+    onSuccess: (r, v) =>
+      qc.setQueriesData<SalaryMonth>({ queryKey: key('salary-month') }, (old) =>
+        old ? applySavedToMonth(old, v.staffId, r, v.reason, who, new Date().toISOString()) : old,
+      ),
     onSettled: () => void invalidate(),
   });
 }

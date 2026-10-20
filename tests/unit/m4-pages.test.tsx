@@ -232,6 +232,61 @@ describe('salary calculator (manager)', () => {
   });
 });
 
+describe('after a save the status is never the old "Changed since saved"', () => {
+  it('save and replay show "Saved vN" at once, while the month is still being asked again', async () => {
+    setCtx(CAPS.admin, 'admin');
+    let monthCalls = 0;
+    let saves = 0;
+    onRpc((fn) => {
+      if (fn === 'get_salary_month') {
+        monthCalls += 1;
+        // first load: saved v1 but changed since; every later refetch hangs (the server is slow)
+        if (monthCalls === 1)
+          return {
+            data: salaryMonth([monthRow({ status: 'changed', saved: savedSnapshot() })], true, {
+              saved: 1,
+              changed: 1,
+              not_saved: 0,
+            }),
+          };
+        return new Promise(() => undefined);
+      }
+      if (fn === 'preview_salary')
+        return { data: computation({ attended_days: 16, payable_paise: 3_400_000 }) };
+      if (fn === 'get_salary_calculations') return { data: [] };
+      if (fn === 'list_paid_leave') return { data: [] };
+      if (fn === 'save_salary_calculation') {
+        saves += 1;
+        return {
+          data: {
+            ...computation({ attended_days: 16, payable_paise: 3_400_000 }),
+            salary_calculation_id: M4.calc2,
+            version_no: 2,
+            ...(saves > 1 ? { replayed: true } : {}),
+          },
+        };
+      }
+      return { data: null };
+    });
+    renderAt(`/salary/${M4.staff}?month=2026-09`, [
+      { path: '/salary/:staffId', element: <SalaryStaffPage /> },
+    ]);
+    expect(await screen.findByTestId('salary-status')).toHaveTextContent('Changed since saved');
+    const save = await screen.findByRole('button', { name: 'Save calculation' });
+    await waitFor(() => expect(save).toBeEnabled());
+    await userEvent.click(save);
+    await screen.findByText('Saved as version 2.');
+    expect(screen.getByTestId('salary-status')).toHaveTextContent('Saved v2');
+    expect(screen.queryByText(/changed after version/)).not.toBeInTheDocument();
+    expect(monthCalls).toBeGreaterThan(1); // the refetch was asked and is still pending
+    // the replay keeps it
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save calculation' })).toBeEnabled());
+    await userEvent.click(screen.getByRole('button', { name: 'Save calculation' }));
+    await screen.findByText('Already saved — no new version (version 2 is unchanged).');
+    expect(screen.getByTestId('salary-status')).toHaveTextContent('Saved v2');
+  });
+});
+
 describe('salary for readers (Owner)', () => {
   beforeEach(() => setCtx(CAPS.owner, 'owner'));
 
@@ -618,6 +673,33 @@ describe('extra lesson', () => {
       p_subject_id: M2.english,
       p_ctx_rev: 1,
     });
+  });
+
+  it('the per-date limit (~12 extra lessons per section and date) shows the server message', async () => {
+    setCtx(CAPS.admin, 'admin');
+    onRpc((fn) => {
+      if (fn === 'get_setup_snapshot') return { data: snapshotM2() };
+      if (fn === 'list_class_subjects') return { data: classSubjectsM2() };
+      if (fn === 'list_staff') return { data: [] };
+      if (fn === 'add_extra_lesson') return hinted('LIMIT_REACHED', 'Too many lessons on this date');
+      return { data: null };
+    });
+    renderAt('/', [
+      {
+        path: '/',
+        element: <ExtraLessonDialog date="2026-10-23" sectionId={M2.sectionA} onClose={() => undefined} />,
+      },
+    ]);
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText('Starts at'), { target: { value: '15:00' } });
+    fireEvent.change(within(dialog).getByLabelText('Ends at'), { target: { value: '15:40' } });
+    await waitFor(() => expect(within(dialog).getByLabelText('Subject')).toBeEnabled());
+    await userEvent.click(within(dialog).getByLabelText('Subject'));
+    await userEvent.click(await screen.findByRole('option', { name: 'English' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Add extra lesson' }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Too many lessons on this date');
+    expect(within(dialog).queryByTestId('extra-exists')).not.toBeInTheDocument();
+    expect(calls('add_extra_lesson')).toHaveLength(1); // a definite refusal is not re-sent
   });
 });
 
