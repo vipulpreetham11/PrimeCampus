@@ -553,7 +553,9 @@ export const collectionReportSchema = z.object({
     z.object({ date: isoDate, method: z.enum(PAYMENT_METHODS), count, amount_paise: paise }),
   ),
   // migration 2330: ids for the day book's filters
-  by_collector: z.array(z.object({ collector: z.string().nullable(), collected_by: id, amount_paise: paise })),
+  by_collector: z.array(
+    z.object({ collector: z.string().nullable(), collected_by: id, amount_paise: paise }),
+  ),
   by_account: z.array(
     z.object({ account: z.string(), receiving_account_id: id.nullable(), amount_paise: paise }),
   ),
