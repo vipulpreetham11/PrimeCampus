@@ -156,7 +156,15 @@ export async function initSession(): Promise<void> {
       showNotice('signed_out', 'Could not reach PrimeCampus. Check your connection and sign in again.');
       return;
     }
-    await localSignOut(err.code === 'FORBIDDEN' ? err.message : undefined);
+    // UNAUTHENTICATED here = the server ended this app session (sign-out elsewhere, reset, or idle for
+    // 30 days — the M4 daily clean-up): drop the Auth session too and ask for a fresh sign-in.
+    await localSignOut(
+      err.code === 'FORBIDDEN'
+        ? err.message
+        : err.code === 'UNAUTHENTICATED'
+          ? 'Your session has ended. Please sign in again.'
+          : undefined,
+    );
   }
 }
 

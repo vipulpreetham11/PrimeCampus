@@ -160,7 +160,7 @@ function ChangeRow({ c, onPerson }: { c: AttendanceChange; onPerson: () => void 
         )}
       </div>
       <p className="mt-1" data-testid="change-statuses">
-        <span>{statusWord(c.old_status)}</span> <span aria-hidden="true">→</span>
+        <span>{statusWord(c.old_status)}</span> <span aria-hidden="true">→</span>{' '}
         <span className="sr-only">changed to</span>{' '}
         <span className="font-medium">{statusWord(c.new_status)}</span>
       </p>

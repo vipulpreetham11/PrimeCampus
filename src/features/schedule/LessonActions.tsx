@@ -280,7 +280,7 @@ export function hhmm(time: string): string {
 
 /** Client check before sending (the server checks again, plus overlaps): end after start. */
 export function timeRangeProblem(start: string, end: string): string | null {
-  if (!/^d{2}:d{2}$/.test(start) || !/^d{2}:d{2}$/.test(end)) return 'Choose a start and an end time';
+  if (!/^\d{2}:\d{2}$/.test(start) || !/^\d{2}:\d{2}$/.test(end)) return 'Choose a start and an end time';
   return end > start ? null : 'The end time must be later than the start time';
 }
 
