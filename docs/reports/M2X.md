@@ -254,3 +254,75 @@ All through the UI unless noted; Demo School only; logins `demo.*` (their passwo
 
 `.env.local` (git-ignored) holds `E2E_OPERATOR_USERNAME` / `E2E_OPERATOR_PASSWORD`; export them into the
 shell, then `npx playwright test` (all specs, serial; Demo School only).
+
+## Test date fix (20 Oct 2026)
+
+Branch `test/m2-date-fix` (from `main` at `4b13433`). Test code only: `tests/e2e/m2.spec.ts` and
+`tests/e2e/m2x-m2.spec.ts`. No app, backend or helper changes.
+
+### What depended on today's date
+
+Both specs were written on 19 Oct and treated it as "today". Demo School is period-wise on **19 Oct
+2026** only and day-wise from **20 Oct 2026**. `get_setup_snapshot.attendance_modes` lists only the
+mode in force today plus later changes, so from 20 Oct the 19 Oct row is no longer listed.
+
+| Where | Problem | Now |
+|---|---|---|
+| `m2.spec` dates | PAST = latest day-wise school day ≤ today, and the period day was found from the snapshot. From 20 Oct the snapshot has no period row, so **test 2 skipped itself**, and PAST moved forward every day. | Fixed days: period day **19 Oct**, PAST **20 Oct**, START = Monday of PAST's week (19 Oct). `beforeAll` checks both are still student school days (fails loudly otherwise). |
+| `m2.spec` FUT | Next working day in a ±14-day calendar window. | Next school day after today from the student calendar whose day a week later is also a school day (test 6 checks both). |
+| `m2.spec` test 1 | Update lessons from START to today+13. After about 9 Nov that is over the server's 63-day limit (`LIMIT_REACHED`). | The range starts at START or at (today+13 − 62), whichever is later. Past lessons are never refreshed by the server, and those of the fixed days already exist (and are marked). |
+| `m2x-m2` M2-1 | When a mode row existed in the past, it filled **today** into "Starts on" and saved. From 21 Oct that would have **added a real "Daily attendance from 21 Oct" row** to Demo School (permanent). On 20 Oct its snapshot assertion failed (the M3 report's M2-1 failure). | Writes only a start date of today or later (create, or DUPLICATE under "Starts on" on a re-run). A past start date: the form shows "A change cannot start in the past", and no `set_attendance_mode` request is sent (counted). Then it reads each fixed day's mode from the server (`get_marking_roster.mode_on_date` as `demo.admin`: 19 Oct `period`, 20 Oct `daily`) and checks Setup shows today's mode. |
+| `m2x-m2` M2-4/M2-5 | "Next Monday" = today's date + n, holiday or not. | The first Monday after today that is a student school day (calendar). |
+| `m2x-m2` M2-6 | Copy start = today + 30…129 days. From late November that is after the academic year ends (31 Mar 2027 → `VALIDATION_ERROR`). | A per-run date between tomorrow and the end of the current academic year. |
+| `m2x-m2` M2-7 | Opened **today's** day register (no lessons on a holiday or a Sunday). | The fixed day-wise day, 20 Oct (nothing is saved). |
+
+Checked live after the runs: Demo School's attendance modes are still exactly period from 19 Oct and
+daily from 20 Oct.
+
+### `m2.spec` test 6 (timetable change → regenerate): not a date problem
+
+The failure (M3 full run 2, and M2X run 2 in test 5): the homework was saved, the dialog closed, and
+the homework did not appear in the lesson's homework list within 30 s.
+
+- **Not caused by the dates.** Test 6 never used the fixed past days; its FUT is the next school day,
+  which is the same on every run of a day. Runs that passed used the same FUT as the runs that failed
+  (M2X runs 1–4 on 19 Oct; today's M3 run 1). The M2X failure was in test 5, on a different (past)
+  lesson, as the teacher. What the two have in common is the lesson page's homework list after
+  "Set homework".
+- **Live data (read-only SQL) of the failed M3 run 2:** the homework "Bring the reading log — 4EUF5"
+  was created at 03:26:16 UTC on the right lesson (21 Oct Period 2), and no 21 Oct timetable version
+  was created. So the run stopped exactly at "homework listed". In the passing run 1, the version
+  followed the homework 0.5 s later.
+- **Ruled out by reading the code:** the list is `list_homework` for the section and the lesson date
+  (first page of 50), filtered by lesson. Class 1 A has at most 15 active homework on any date (after these runs), so
+  paging is not the cause. The text is unique per run, so it is not a DUPLICATE. `save_homework`
+  commits before the client invalidates the list.
+- **Not reproduced:** both full runs below, and 6 more runs of tests 1, 5 and 6 back to back on the same
+  day, all passed (8 runs of test 6 today).
+- **Not explained.** It may be a transient refresh or backend failure, or an app-side race in the list
+  refresh after a create. I could not tell which. Test 6 now attaches evidence if it fails again: each
+  `save_homework` / `list_homework` response (time, status, whether it contains the run's homework) and
+  the lesson page text, as "homework not listed" in the Playwright report. Nothing else in test 6 changed.
+
+### Live runs (20 Oct 2026, all specs, serial, Demo School only)
+
+| Run | Result | Duration |
+|---|---|---|
+| 1 | **94 passed**, 0 failed, 0 skipped | 9.8 min |
+| 2 (right after 1) | **94 passed**, 0 failed, 0 skipped | 10.0 min |
+| Tests 1 + 5 + 6 of `m2.spec`, 6 times in a row | 18 passed | 0.6–1.4 min each |
+
+`m2.spec` test 2 (period marking on 19 Oct) runs again; it had skipped itself since 20 Oct.
+The screenshots the suite rewrites (`docs/reports/m*-screens/`) were restored to their committed versions.
+Gates: `typecheck`, `lint`, `test`, `build` ✅.
+
+### Not verified
+
+- A run **on a later day**. Today is 20 Oct, so M2-1's "past start date" branch ran for 19 Oct only (20 Oct
+  took the DUPLICATE branch). The 63-day lesson range, the year-end clamp for M2-6 and a holiday Monday have
+  only been reasoned about, not run. The server's date can't be faked from the tests.
+- After the academic year 2026-27 ends (31 Mar 2027), the fixed dates are in a past year. The specs then
+  need new fixed days (and a new mode history) in the new year.
+
+Demo School data added: the usual data of two full runs, plus 6 × (a Class 1 A timetable version from
+19 Oct, a diary edit and a checked homework on 20 Oct, a homework on 21 Oct and a version from 21 Oct).

@@ -18,11 +18,14 @@ import {
 // M2X close-out of M2, LIVE backend, Demo School only (every login `demo.*`). Everything through the
 // UI; the API helper only gives demo logins a known password, looks up ids and dates, and counts rows.
 //
-// Attendance mode: Demo School is set to period-wise FROM TODAY (the first run: 19 Oct 2026) and back
-// to day-wise FROM TOMORROW (20 Oct 2026), through Setup → Attendance mode. Both rows are permanent;
-// later runs find them and check the server's DUPLICATE under the "Starts on" field instead.
+// Attendance mode: Demo School was set to period-wise from 19 Oct 2026 (the first run's today) and
+// back to day-wise from 20 Oct 2026, through Setup → Attendance mode. Both rows are permanent. A run
+// only writes a row whose start is today or later (and sees the server's DUPLICATE under "Starts on"
+// if it exists); from 21 Oct on, both starts are in the past, so M2-1 only checks the form refuses
+// them and reads the mode of each day back. Every other test uses those fixed days, or the next
+// school Monday from the student calendar, so the file does not depend on the day it runs.
 // Period marking with mark-remaining-present + 2 exceptions and the two-tab conflict run in
-// m2.spec.ts test 2 (it uses the latest period-wise day, i.e. that day).
+// m2.spec.ts test 2 (on 19 Oct).
 
 const OPERATOR = process.env.E2E_OPERATOR_USERNAME ?? '';
 const OPERATOR_PASSWORD = process.env.E2E_OPERATOR_PASSWORD ?? '';
@@ -39,8 +42,12 @@ const pw: Record<string, string> = {};
 const ids: Record<string, string> = {};
 let op: ApiSession;
 
-/** Next Monday after today (future lessons for the lesson actions). */
-const NEXT_MONDAY = addDays(TODAY, 8 - isoWeekday(TODAY));
+/** The first Monday after today that is a student school day (future lessons for the lesson actions). */
+let NEXT_MONDAY = '';
+/** Last day of the current academic year (timetable start dates must be inside it). */
+let YEAR_END = '';
+const daysBetween = (a: string, b: string) =>
+  Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000);
 const fmtLong = (iso: string) =>
   new Intl.DateTimeFormat('en-IN', {
     day: 'numeric',
@@ -61,6 +68,20 @@ test.beforeAll(async () => {
   }>('get_setup_snapshot');
   const cls = new Map(snap.classes.map((c) => [c.id, c.name]));
   for (const s of snap.sections) ids[`${cls.get(s.class_id)} ${s.name}`] = s.id;
+  const ctx = await op.rpc<{ current_year: { id: string } }>('get_context');
+  const cal = await op.school<{
+    academic_year: { end_date: string };
+    resolved: { date: string; weight: number }[];
+  }>('get_calendar', {
+    p_academic_year_id: ctx.current_year.id,
+    p_audience: 'student',
+    p_from: addDays(TODAY, 1),
+    p_to: addDays(TODAY, 28),
+  });
+  const monday = cal.resolved.find((d) => d.weight > 0 && isoWeekday(d.date) === 1)?.date;
+  if (!monday) throw new Error('No school Monday in the next four weeks');
+  NEXT_MONDAY = monday;
+  YEAR_END = cal.academic_year.end_date;
 });
 test.afterAll(async () => {
   await op?.signOut();
@@ -95,50 +116,71 @@ async function lessonMenu(page: Page, card: ReturnType<Page['getByTestId']>, ite
 }
 
 // ------------------------------------------------------------------ 1. attendance mode
-test('M2-1. Attendance mode: period-wise from 19 Oct 2026, day-wise again from 20 Oct (Setup → Attendance mode)', async ({
+test('M2-1. Attendance mode: period-wise on 19 Oct 2026, day-wise again from 20 Oct (Setup → Attendance mode)', async ({
   browser,
 }) => {
   test.setTimeout(240_000);
   const { context, page } = await asAdmin(browser);
+  const modeSaves = () => seen.filter((s) => s.url.endsWith('/rpc/set_attendance_mode')).length;
   for (const [mode, from] of [
     ['Period-wise attendance', PERIOD_FROM],
     ['Daily attendance', DAILY_FROM],
   ] as const) {
     await page.goto('/setup/attendance-mode');
     await expect(page.getByTestId('mode-today')).toBeVisible({ timeout: 30_000 });
+    await choose(page, 'Mode', mode);
+    const starts = page.getByLabel('Starts on');
+    await starts.fill(from);
+    if (from < TODAY) {
+      // a later day's run: history is never rewritten — the form refuses a past start and sends nothing
+      const before = modeSaves();
+      await page.getByRole('button', { name: 'Save change' }).click();
+      await expect(page.getByText('A change cannot start in the past')).toBeVisible();
+      await expect(starts).toHaveAttribute('aria-invalid', 'true');
+      expect(modeSaves()).toBe(before);
+      continue;
+    }
+    // the snapshot lists the mode in force today and later changes, so a row from today on is there
     const snap = await op.school<{ attendance_modes: { mode: string; effective_from: string }[] }>(
       'get_setup_snapshot',
     );
     const exists = snap.attendance_modes.some((m) => m.effective_from === from);
-    if (!exists && from < TODAY) continue; // can't be created in the past (a later day's run)
-    await choose(page, 'Mode', mode);
-    const starts = page.getByLabel('Starts on');
-    await starts.fill(from < TODAY ? TODAY : from);
     await page.getByRole('button', { name: 'Save change' }).click();
     if (!exists) {
       await expect(page.locator('[data-sonner-toast]').filter({ hasText: `${mode} from` })).toBeVisible();
-    } else if (from >= TODAY) {
+    } else {
       // a re-run: the server's DUPLICATE (2310) is shown under "Starts on"
       await expect(page.getByText('A mode change already starts on this date')).toBeVisible();
       await expect(starts).toHaveAttribute('aria-invalid', 'true');
     }
   }
-  const snap = await op.school<{ attendance_modes: { mode: string; effective_from: string }[] }>(
-    'get_setup_snapshot',
-  );
-  expect(snap.attendance_modes).toEqual(
-    expect.arrayContaining([
-      expect.objectContaining({ mode: 'period', effective_from: PERIOD_FROM }),
-      expect.objectContaining({ mode: 'daily', effective_from: DAILY_FROM }),
-    ]),
-  );
   await page.goto('/setup/attendance-mode');
-  if (TODAY === PERIOD_FROM) {
+  if (TODAY < DAILY_FROM) {
     await expect(page.getByTestId('mode-today')).toContainText('Period-wise attendance');
     await expect(page.getByText(`from ${fmtLong(DAILY_FROM)}`)).toBeVisible();
+  } else {
+    await expect(page.getByTestId('mode-today')).toContainText('Daily attendance');
   }
-
   await context.close();
+
+  // the mode of each fixed day, as the server applies it (get_marking_roster's mode_on_date)
+  const api = await ApiSession.signIn('demo.admin', pw.admin!);
+  try {
+    await api.enterDemo('admin');
+    for (const [day, mode] of [
+      [PERIOD_FROM, 'period'],
+      [DAILY_FROM, 'daily'],
+    ] as const) {
+      const roster = await api.school<{ mode_on_date: string }>('get_marking_roster', {
+        p_kind: 'daily',
+        p_section_id: ids['Class 1 A'],
+        p_date: day,
+      });
+      expect(roster.mode_on_date, `mode on ${day}`).toBe(mode);
+    }
+  } finally {
+    await api.signOut();
+  }
 });
 
 // ------------------------------------------------------------------ 2. substitute marks a period lesson
@@ -149,7 +191,7 @@ test('M2-2. Period-wise day: Meera Rao absent → Ravi Kumar substitutes her Per
   // on the period-wise day (19 Oct 2026); marking a past day is allowed, so later runs repeat it
   const admin = await asAdmin(browser);
   const page = admin.page;
-  // staff attendance today: Meera Rao absent, everyone else present
+  // staff attendance of that day: Meera Rao absent, everyone else present
   await page.goto(`/staff-attendance?date=${PERIOD_FROM}`);
   await expect(page.getByTestId('staff-roster')).toBeVisible({ timeout: 30_000 });
   const fill = page.getByRole('button', { name: /^(Mark (all|remaining \d+) present|Everyone is marked)$/ });
@@ -215,7 +257,7 @@ test("M2-3. Parent (demo.parent) sees real data for Aarav on the period-wise day
   // the data of the period-wise day (19 Oct 2026: "today" on the first run)
   const note = `Read pages 10–12 aloud (E2E ${RUN})`;
   const hwText = `Learn the five new words — ${RUN}`;
-  // the teacher writes today's diary for his English lesson, sets homework and checks Aarav's
+  // the teacher writes that day's diary for his English lesson, sets homework and checks Aarav's
   const t = await asTeacher(browser);
   await t.page.goto(`/dashboard?date=${PERIOD_FROM}`);
   const english = t.page
@@ -406,7 +448,9 @@ test('M2-6. Copy the active timetable to another section → the same copy again
 }) => {
   test.setTimeout(300_000);
   const { context, page } = await asAdmin(browser);
-  const start = addDays(TODAY, 30 + (Math.floor(Date.now() / 60_000) % 100));
+  // a start date that varies per run, inside the current academic year
+  const span = Math.max(1, daysBetween(addDays(TODAY, 1), YEAR_END) + 1);
+  const start = addDays(TODAY, 1 + ((30 + Math.floor(Date.now() / 60_000)) % span));
   await page.goto(`/timetable?section=${ids['Class 1 A']}`);
   const versions = page.getByRole('list', { name: 'Timetable versions' });
   await expect(versions).toBeVisible({ timeout: 30_000 });
@@ -458,7 +502,8 @@ test('M2-7. Leaving a register with unsaved marks asks first (Stay keeps them; L
 }) => {
   test.setTimeout(240_000);
   const { context, page } = await asTeacher(browser);
-  await page.goto(`/attendance/daily/${ids['Class 1 A']}/${DAILY_FROM <= TODAY ? TODAY : '2026-10-17'}`);
+  // the day-wise school day (nothing is saved here)
+  await page.goto(`/attendance/daily/${ids['Class 1 A']}/${DAILY_FROM}`);
   await expect(page.getByTestId('marking-roster')).toBeVisible({ timeout: 30_000 });
   const first = page.getByTestId('roster-row').nth(0);
   const late = (await first.getByRole('radio', { name: 'Late' }).getAttribute('aria-checked')) === 'true';
