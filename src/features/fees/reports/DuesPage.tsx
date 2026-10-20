@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { DataState } from '@/components/shared/DataState';
 import { MoneyText } from '@/components/shared/MoneyText';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -24,12 +24,14 @@ const ALL = '__all';
 export function DuesPage() {
   const currentYear = useCurrentYearId();
   const navigate = useNavigate();
+  const [params] = useSearchParams();
   const [filter, setFilter] = useState<Omit<DuesFilter, 'yearId'> & { yearId: string | null }>({
     yearId: currentYear,
     classId: null,
     sectionId: null,
     termId: null,
-    onlyOverdue: false,
+    // the dashboard's "overdue" number links here with ?overdue=1
+    onlyOverdue: params.get('overdue') === '1',
     onlyWithBalance: true,
   });
   const snapshot = useSetupSnapshot(filter.yearId);

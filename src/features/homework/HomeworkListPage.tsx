@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { DataState } from '@/components/shared/DataState';
 import { DateInput } from '@/components/shared/DateInput';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { HomeworkListItem } from '@/contracts/academic';
 import { useSetupSnapshot } from '@/features/setup/hooks';
@@ -15,7 +16,7 @@ import {
   useSectionOptions,
   useTeacherOptions,
 } from '@/features/timetable/pickers';
-import { addDays, daysBetween, formatDate, schoolToday } from '@/lib/dates';
+import { addDays, daysBetween, formatDate, isIsoDate, schoolToday } from '@/lib/dates';
 import { useCan } from '@/lib/scope';
 import { HomeworkFormDialog } from './HomeworkFormDialog';
 import { useHomeworkList, type HomeworkFilter } from './hooks';
@@ -28,14 +29,17 @@ const ALL = '__all__';
 export function HomeworkListPage() {
   const readAll = useCan('academic.read_all');
   const today = schoolToday();
-  const [filter, setFilter] = useState<HomeworkFilter>({
-    from: addDays(today, -30),
-    to: today,
+  // The dashboard links here with ?due_unchecked=1&from=&to= (its "homework due, no checks" number).
+  const [params] = useSearchParams();
+  const [filter, setFilter] = useState<HomeworkFilter>(() => ({
+    from: isIsoDate(params.get('from')) ? (params.get('from') as string) : addDays(today, -30),
+    to: isIsoDate(params.get('to')) ? (params.get('to') as string) : today,
     sectionId: null,
     subjectId: null,
     staffId: null,
     status: 'active',
-  });
+    dueUnchecked: params.get('due_unchecked') === '1',
+  }));
   const [editing, setEditing] = useState<HomeworkListItem | null>(null);
   const { options: sections } = useSectionOptions();
   const { options: teachers } = useTeacherOptions();
@@ -52,7 +56,7 @@ export function HomeworkListPage() {
       <PageHeader title="Homework" description="Homework set in lessons, with how much has been checked." />
       <div className="flex flex-wrap items-end gap-3">
         <div className="grid gap-1.5">
-          <Label htmlFor="hw-from">Set from</Label>
+          <Label htmlFor="hw-from">{filter.dueUnchecked ? 'Due from' : 'Set from'}</Label>
           <DateInput id="hw-from" value={filter.from} onChange={(v) => set({ from: v })} />
         </div>
         <div className="grid gap-1.5">
@@ -93,6 +97,14 @@ export function HomeworkListPage() {
             options={teachers}
           />
         )}
+        <div className="flex min-h-11 items-center gap-2">
+          <Switch
+            id="hw-due-unchecked"
+            checked={!!filter.dueUnchecked}
+            onCheckedChange={(v) => set({ dueUnchecked: v })}
+          />
+          <Label htmlFor="hw-due-unchecked">Due in this range, nothing checked yet</Label>
+        </div>
         <div className="grid gap-1.5">
           <Label htmlFor="hw-status">Status</Label>
           <Select value={filter.status} onValueChange={(v) => set({ status: v as HomeworkFilter['status'] })}>
