@@ -36,6 +36,7 @@ import {
   issueText,
   parseDays,
   requiredOverride,
+  requiredOverrides,
   salaryMonthCsv,
   statusText,
 } from '@/features/salary/logic';
@@ -154,6 +155,27 @@ describe('salary override validation', () => {
     const r = buildOverrides(EMPTY_OVERRIDES, null, 'monthly_salary_paise');
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.errors.monthly_salary).toMatch(/No salary rate/);
+  });
+  it('a new group with no calendar and no rate needs both overrides', () => {
+    const live = { monthly_salary_paise: null, working_days: 0 };
+    expect(requiredOverrides(live)).toEqual(['monthly_salary_paise', 'working_days']);
+    expect(requiredOverrides({ monthly_salary_paise: 100, working_days: 20 })).toEqual([]);
+    const onlySalary = buildOverrides(
+      { ...EMPTY_OVERRIDES, monthly_salary: '15000', reason: 'r' },
+      null,
+      requiredOverrides(live),
+    );
+    expect(onlySalary).toEqual({
+      ok: false,
+      errors: { working_days: 'There are no working days on the calendar — enter the working days' },
+    });
+    expect(
+      buildOverrides(
+        { ...EMPTY_OVERRIDES, monthly_salary: '15000', working_days: '22', reason: 'r' },
+        null,
+        requiredOverrides(live),
+      ),
+    ).toEqual({ ok: true, overrides: { monthly_salary_paise: 1_500_000, working_days: 22 }, reason: 'r' });
   });
   it('server field names map to the form; saved overrides refill the form', () => {
     expect(formFieldForServer('monthly_salary_paise')).toBe('monthly_salary');

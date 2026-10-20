@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import type { SalaryComputation, SalaryMonthRow, SalaryOverrides } from '@/contracts/salary';
+import type { OverrideKey, SalaryComputation, SalaryMonthRow, SalaryOverrides } from '@/contracts/salary';
 import { isUncertainFailure } from '@/lib/create-check';
 import {
   formatDate,
@@ -40,6 +40,7 @@ import {
   monthParam,
   parseMonthParam,
   requiredOverride,
+  requiredOverrides,
   sameOverrides,
   type OverrideForm,
   type OverrideFormField,
@@ -258,7 +259,9 @@ function Calculator({ staffId, month, row }: { staffId: string; month: string; r
   const [saveError, setSaveError] = useState<AppError | null>(null);
   const preview = useSalaryPreview(staffId, month, applied.overrides, true);
   const save = useSaveSalary();
-  const required = requiredOverride(row.live?.resolution_reason ?? null);
+  // every override the plain calculation needs (both, for a new group with no calendar and no rate);
+  // the server names only the first in resolution_reason
+  const required = requiredOverrides(row.live);
   const calculated = row.live
     ? {
         working_days: row.live.working_days,
@@ -511,7 +514,7 @@ function OverrideFields({
   errors: Partial<Record<OverrideFormField, string>>;
   set: (k: OverrideFormField, v: string) => void;
   placeholders: { working_days: number; attended_days: number; paid_leave_days: number } | null;
-  required: string | null;
+  required: readonly OverrideKey[];
 }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
@@ -519,7 +522,7 @@ function OverrideFields({
         <FieldBox
           key={f.key}
           id={`ov-${f.key}`}
-          label={`${f.label} (0–31, steps of 0.5)`}
+          label={`${f.label} (0–31, steps of 0.5${required.includes(f.key) ? ', required' : ''})`}
           error={errors[f.key]}
         >
           <Input
@@ -537,7 +540,9 @@ function OverrideFields({
       ))}
       <FieldBox
         id="ov-monthly_salary"
-        label={required === 'monthly_salary_paise' ? 'Monthly salary (₹, required)' : 'Monthly salary (₹)'}
+        label={
+          required.includes('monthly_salary_paise') ? 'Monthly salary (₹, required)' : 'Monthly salary (₹)'
+        }
         error={errors.monthly_salary}
       >
         <div className="relative">

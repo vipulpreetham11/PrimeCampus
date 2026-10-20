@@ -110,6 +110,17 @@ export function deductionPaise(c: FormulaInput): number | null {
   return c.monthly_salary_paise - c.payable_paise;
 }
 
+/** Every override the plain calculation needs: no salary rate, and/or no working days on the calendar. */
+export function requiredOverrides(
+  live: { monthly_salary_paise: number | null; working_days: number } | null,
+): OverrideKey[] {
+  if (!live) return [];
+  const out: OverrideKey[] = [];
+  if (live.monthly_salary_paise === null) out.push('monthly_salary_paise');
+  if (live.working_days <= 0) out.push('working_days');
+  return out;
+}
+
 /** Which override a "needs manual resolution" reason asks for. */
 export function requiredOverride(reason: string | null): OverrideKey | null {
   if (!reason) return null;
@@ -161,8 +172,13 @@ export type BuiltOverrides =
 export function buildOverrides(
   form: OverrideForm,
   calculated: Pick<SalaryComputation, 'working_days' | 'attended_days' | 'paid_leave_days'> | null,
-  required: OverrideKey | null = null,
+  requiredKeys: OverrideKey | null | readonly (OverrideKey | null)[] = null,
 ): BuiltOverrides {
+  // several can apply at once: a new staff group with no calendar and no salary needs both
+  const req = new Set(Array.isArray(requiredKeys) ? requiredKeys : [requiredKeys]);
+  const required = {
+    has: (k: OverrideKey) => req.has(k),
+  };
   const errors: Partial<Record<OverrideFormField, string>> = {};
   const overrides: SalaryOverrides = {};
   for (const key of ['working_days', 'attended_days', 'paid_leave_days'] as const) {
@@ -176,11 +192,11 @@ export function buildOverrides(
     if (r.ok) overrides.monthly_salary_paise = r.paise;
     else errors.monthly_salary = r.error;
   }
-  if (required === 'monthly_salary_paise' && overrides.monthly_salary_paise === undefined)
+  if (required.has('monthly_salary_paise') && overrides.monthly_salary_paise === undefined)
     errors.monthly_salary ??= 'No salary rate is recorded — enter the monthly salary for this month';
-  if (required === 'working_days' && overrides.working_days === undefined)
+  if (required.has('working_days') && overrides.working_days === undefined)
     errors.working_days ??= 'There are no working days on the calendar — enter the working days';
-  if (required === 'working_days' && overrides.working_days === 0)
+  if (required.has('working_days') && overrides.working_days === 0)
     errors.working_days ??= 'Working days must be more than 0';
 
   const reason = form.reason.trim();

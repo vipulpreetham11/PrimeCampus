@@ -234,7 +234,14 @@ test('1. Salary: paid leave, preview, save, "Already saved", "Changed since save
   });
   const saved = (await salaryRow()).row;
   expect(saved.saved!.version_no).toBe(before + 1);
+  expect(saved.status).toBe('saved'); // 2420: the server agrees right after the save
   expect(formula).toContain(inr(saved.saved!.payable_paise));
+  // never the old "Changed since saved" after a save: on this page and in the month view
+  await expect(page.getByTestId('salary-status')).toHaveText(`Saved v${before + 1}`);
+  await page.goto(`/salary?month=${SALARY_PARAM}`);
+  await expect(lataRow.getByTestId('salary-status')).toHaveText(`Saved v${before + 1}`, { timeout: 60_000 });
+  await lataRow.getByRole('link', { name: 'Lata Iyer' }).click();
+  await expect(page.getByTestId('salary-formula')).toBeVisible({ timeout: 60_000 });
   // the same again: nothing new
   await expect(save).toBeEnabled({ timeout: 30_000 });
   await save.click();
@@ -244,6 +251,10 @@ test('1. Salary: paid leave, preview, save, "Already saved", "Changed since save
   expect((await salaryRow()).row.saved!.version_no).toBe(before + 1);
   await expect(page.getByTestId('salary-status')).toHaveText(`Saved v${before + 1}`);
   await shot(page, `${SHOTS}/desktop-salary-calculator.png`);
+  // after the replay the month view still says "Saved vN"
+  await page.goto(`/salary?month=${SALARY_PARAM}`);
+  await expect(lataRow.getByTestId('salary-status')).toHaveText(`Saved v${before + 1}`, { timeout: 60_000 });
+  expect((await salaryRow()).row.status).toBe('saved');
 
   // an attendance change afterwards: flip Lata's mark on flipDay (Present ↔ Absent)
   await flipLata(page, flipDay);
