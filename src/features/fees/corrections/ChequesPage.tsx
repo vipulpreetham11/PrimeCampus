@@ -300,10 +300,12 @@ function ClearDialog({ cheque, onClose }: { cheque: ChequeRow; onClose: () => vo
               <ul className="divide-y rounded-md border text-sm">
                 {invoices.map((inv) => (
                   <li key={inv.invoice_id} className="grid grid-cols-[1fr_9rem] items-center gap-2 p-2">
-                    <span>
+                    <Label htmlFor={`clear-alloc-${inv.invoice_id}`} className="font-normal">
+                      <span className="sr-only">Amount for </span>
                       {inv.invoice_no} · balance <MoneyText paise={inv.balance_paise} />
-                    </span>
+                    </Label>
                     <MoneyInput
+                      id={`clear-alloc-${inv.invoice_id}`}
                       value={alloc[inv.invoice_id] ?? 0}
                       onChange={(p) => setAlloc((a) => ({ ...a, [inv.invoice_id]: p ?? 0 }))}
                       invalid={!!check.rowErrors[inv.invoice_id]}

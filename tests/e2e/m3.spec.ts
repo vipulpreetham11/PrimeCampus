@@ -43,6 +43,21 @@ const PRESET = `Tuition 10% ${RUN}`;
 const CHEQUE_NO = Date.now().toString().slice(-8);
 const UTR = `UTR${RUN}A1`;
 
+// Amounts carry a per-run paise offset: since 2330 the same payment (student, method, amount, date) within 30
+// minutes is refused as a possible duplicate, and two runs in a row must not look like one payment typed twice.
+const S = (Math.floor(Date.now() / 60_000) % 97) + 1;
+const A = { cash1: 100_000 + S, cash2: 50_000 + S, upi: 70_000 + S, anaya: 10_000 + S };
+const B = {
+  afterCash: 450_000 - A.cash1 - A.cash2,
+  afterUpi: 450_000 - A.cash1 - A.cash2 - A.upi,
+  afterReverse: 450_000 - A.cash1 - A.cash2 - A.upi + 30_000,
+};
+const INR = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' });
+/** Display text for paise, as the app shows it. */
+const inr = (p: number) => INR.format(Number(`${Math.trunc(p / 100)}.${String(p % 100).padStart(2, '0')}`));
+/** Typed rupees for paise ("1000.37"). */
+const rs = (p: number) => `${Math.trunc(p / 100)}.${String(p % 100).padStart(2, '0')}`;
+
 test.describe.configure({ mode: 'serial' });
 test.use({ trace: 'off', screenshot: 'off', video: 'off' });
 test.skip(!OPERATOR || !OPERATOR_PASSWORD, 'E2E_OPERATOR_USERNAME / E2E_OPERATOR_PASSWORD not set');
@@ -112,6 +127,9 @@ async function runInvoice(studentId: string) {
 
 /** Put the whole amount on this run's invoice, 0 on every other open invoice. */
 async function allocateOnly(page: Page, invoiceId: string, rupees: string) {
+  // only the first 5 open invoices are shown at first (review item 4)
+  const showAll = page.getByRole('button', { name: /^Show all \d+ invoices$/ });
+  if (await showAll.isVisible()) await showAll.click();
   const inputs = page.getByTestId('allocation-rows').locator('input');
   const n = await inputs.count();
   for (let i = 0; i < n; i++) {
@@ -310,8 +328,8 @@ test('3. Cash partial payment → receipt; double-click and a lost-response retr
   const before = (await statement(ids.aarav)).collections.length;
 
   await openCollect(page, ids.aarav);
-  await page.getByLabel('Amount received').fill('1,000');
-  await allocateOnly(page, ids.invoice!, '1000');
+  await page.getByLabel('Amount received').fill(rs(A.cash1));
+  await allocateOnly(page, ids.invoice!, rs(A.cash1));
   await page.getByTestId('save-payment').dblclick();
   await expect(page).toHaveURL(/\/fees\/receipts\/[0-9a-f-]{36}$/, { timeout: 30_000 });
   await expect(page.getByTestId('posted-notice')).toHaveText('Payment saved.');
@@ -319,13 +337,13 @@ test('3. Cash partial payment → receipt; double-click and a lost-response retr
     id: page.url().split('/').pop()!,
     no: (await page.getByTestId('receipt-no').textContent())!.trim(),
   };
-  await expect(page.getByTestId('receipt-total')).toHaveText('₹1,000.00');
+  await expect(page.getByTestId('receipt-total')).toHaveText(inr(A.cash1));
   expect((await statement(ids.aarav)).collections.length).toBe(before + 1);
 
   // the response is lost after the server saved: "Not confirmed" → retry → the same receipt
   await openCollect(page, ids.aarav);
-  await page.getByLabel('Amount received').fill('500');
-  await allocateOnly(page, ids.invoice!, '500');
+  await page.getByLabel('Amount received').fill(rs(A.cash2));
+  await allocateOnly(page, ids.invoice!, rs(A.cash2));
   let lost = false;
   await page.route('**/rest/v1/rpc/post_collection', async (route) => {
     if (lost) return route.continue();
@@ -345,7 +363,7 @@ test('3. Cash partial payment → receipt; double-click and a lost-response retr
   expect(JSON.parse(posts[0]!.body!).p_operation_id).toBe(JSON.parse(posts[1]!.body!).p_operation_id);
   expect((await statement(ids.aarav)).collections.length).toBe(before + 2);
 
-  await expect(await invoiceBalance(page, ids.aarav, ids.invoiceNo!)).toHaveText('₹3,000.00');
+  await expect(await invoiceBalance(page, ids.aarav, ids.invoiceNo!)).toHaveText(inr(B.afterCash));
   await context.close();
 });
 
@@ -360,8 +378,8 @@ test('4. UPI payment with a reference; the same reference again → DUPLICATE na
     await choose(page, 'Method', 'UPI');
     await choose(page, 'Received into', `${BANK} (Bank account)`);
     await page.getByLabel('Transaction reference (UTR)').fill(UTR);
-    await page.getByLabel('Amount received').fill('700');
-    await allocateOnly(page, ids.invoice!, '700');
+    await page.getByLabel('Amount received').fill(rs(A.upi));
+    await allocateOnly(page, ids.invoice!, rs(A.upi));
     await page.getByTestId('save-payment').click();
   };
   await pay();
@@ -377,7 +395,7 @@ test('4. UPI payment with a reference; the same reference again → DUPLICATE na
       timeout: 30_000,
     },
   );
-  await expect(await invoiceBalance(page, ids.aarav, ids.invoiceNo!)).toHaveText('₹2,300.00');
+  await expect(await invoiceBalance(page, ids.aarav, ids.invoiceNo!)).toHaveText(inr(B.afterUpi));
   await context.close();
 });
 
@@ -396,7 +414,7 @@ test('5. Cheque: pending (dues unchanged) → cleared → bounced → dues reope
   await expect(page.getByTestId('cheque-recorded')).toContainText('Cheque recorded — pending.');
 
   const balance = await invoiceBalance(page, ids.aarav, ids.invoiceNo!);
-  await expect(balance).toHaveText('₹2,300.00'); // a pending cheque does not reduce the dues
+  await expect(balance).toHaveText(inr(B.afterUpi)); // a pending cheque does not reduce the dues
   const pending = page.getByTestId(`pending-cheque-${CHEQUE_NO}`);
   await expect(pending).toContainText('Pending — not counted as paid');
   await expect(pending).toContainText(`Planned for: ${ids.invoiceNo} ₹800.00`);
@@ -408,7 +426,7 @@ test('5. Cheque: pending (dues unchanged) → cleared → bounced → dues reope
   await expect(page.getByText(/Cheque cleared — receipt RCT\//)).toBeVisible({ timeout: 30_000 });
   await choose(page, 'Status', 'Cleared');
   await expect(page.getByTestId(`cheque-${CHEQUE_NO}`).getByTestId('cheque-status')).toHaveText('Cleared');
-  await expect(await invoiceBalance(page, ids.aarav, ids.invoiceNo!)).toHaveText('₹1,500.00');
+  await expect(await invoiceBalance(page, ids.aarav, ids.invoiceNo!)).toHaveText(inr(B.afterUpi - 80000));
 
   await page.goto('/fees/cheques');
   await choose(page, 'Status', 'Cleared');
@@ -416,7 +434,7 @@ test('5. Cheque: pending (dues unchanged) → cleared → bounced → dues reope
   await modal(page).getByLabel('Reason').fill(`Insufficient funds ${RUN}`);
   await modal(page).getByRole('button', { name: 'Mark bounced' }).click();
   await expect(page.getByText('Bounced — the dues are reopened.')).toBeVisible({ timeout: 30_000 });
-  await expect(await invoiceBalance(page, ids.aarav, ids.invoiceNo!)).toHaveText('₹2,300.00');
+  await expect(await invoiceBalance(page, ids.aarav, ids.invoiceNo!)).toHaveText(inr(B.afterUpi));
   await expect(page.getByTestId(`bounced-cheque-${CHEQUE_NO}`)).toContainText(`Insufficient funds ${RUN}`);
   await context.close();
 });
@@ -431,17 +449,19 @@ test('6. Reverse part of a collection with a reason; the original receipt still 
   const pay = page.getByTestId(`payment-${receipts.cash!.no}`);
   await pay.getByRole('button', { name: 'Reverse' }).click();
   const dlg = modal(page);
-  await expect(dlg).toContainText('Still reversible: ₹1,000.00');
+  await expect(dlg).toContainText(`Still reversible: ${inr(A.cash1)}`);
   await dlg.getByLabel(/Amount to reverse/).fill('300');
   await dlg.getByLabel('Reason').fill(`Entered too much ${RUN}`);
   await dlg.getByRole('button', { name: 'Reverse' }).click();
-  await expect(page.getByText('Reversed. Still reversible: ₹700.00.')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(`Reversed. Still reversible: ${inr(A.cash1 - 30000)}.`)).toBeVisible({
+    timeout: 30_000,
+  });
   await expect(pay).toContainText('Partly reversed');
-  await expect(await invoiceBalance(page, ids.aarav, ids.invoiceNo!)).toHaveText('₹2,600.00');
+  await expect(await invoiceBalance(page, ids.aarav, ids.invoiceNo!)).toHaveText(inr(B.afterReverse));
 
   await page.goto(`/fees/receipts/${receipts.cash!.id}`);
   await expect(page.getByTestId('receipt-no')).toHaveText(receipts.cash!.no);
-  await expect(page.getByTestId('receipt-total')).toHaveText('₹1,000.00'); // original content
+  await expect(page.getByTestId('receipt-total')).toHaveText(inr(A.cash1)); // original content
   await expect(page.getByTestId('receipt-reversals')).toContainText(`Entered too much ${RUN}`);
   await expect(page.getByRole('button', { name: 'Print' })).toBeVisible();
   await context.close();
@@ -472,18 +492,18 @@ test('7. Late-fee rule; Apply late fees twice → one charge; waive with a reaso
   await expect(await apply()).toContainText('Late fees added: 0.', { timeout: 60_000 });
   let inv = await runInvoice(ids.aarav);
   expect((inv.adjustments ?? []).filter((a) => a.kind === 'late_fee')).toHaveLength(1);
-  await expect(await invoiceBalance(page, ids.aarav, ids.invoiceNo!)).toHaveText('₹2,700.00');
+  await expect(await invoiceBalance(page, ids.aarav, ids.invoiceNo!)).toHaveText(inr(B.afterReverse + 10000));
 
   const card = page.getByTestId(`invoice-${ids.invoiceNo}`);
   await card.getByRole('button', { name: 'Waive late fee' }).click();
   await modal(page).getByLabel('Reason').fill(`First delay forgiven ${RUN}`);
   await modal(page).getByRole('button', { name: 'Waive late fee' }).click();
   await expect(page.getByText('Late fee waived.')).toBeVisible({ timeout: 30_000 });
-  await expect(card.getByTestId('invoice-balance').locator('dd')).toHaveText('₹2,600.00');
+  await expect(card.getByTestId('invoice-balance').locator('dd')).toHaveText(inr(B.afterReverse));
   await card.getByRole('button', { name: 'Details' }).click();
   await expect(card).toContainText('Late fee waived');
   inv = await runInvoice(ids.aarav);
-  expect(inv.balance_paise).toBe(260000);
+  expect(inv.balance_paise).toBe(B.afterReverse);
   await context.close();
 });
 
@@ -592,7 +612,7 @@ test('10. Owner sees reports with no action buttons; parent sees own child state
   // a receipt for Anaya (the parent's other child), so "the other child's receipt by URL" is real
   const a = await asAccountant(browser);
   await openCollect(a.page, ids.anaya, 'Anaya Sharma');
-  await a.page.getByLabel('Amount received').fill('100');
+  await a.page.getByLabel('Amount received').fill(rs(A.anaya));
   await a.page.getByTestId('save-payment').click();
   await expect(a.page).toHaveURL(/\/fees\/receipts\//, { timeout: 30_000 });
   receipts.anaya = { id: a.page.url().split('/').pop()!, no: '' };
@@ -662,7 +682,16 @@ test('11. 375px screenshots (collect, statement, receipt print preview, dues) an
   await page.getByLabel('Amount received').fill('250');
   await expect(page.getByTestId('allocation-status')).toContainText('adds up exactly');
   await noHorizontalScroll(page);
-  await shot(page, `${SHOTS}/375-collect-payment.png`);
+  // the sticky bar (status + Save) is on screen, above the bottom navigation, without scrolling
+  const bar = await page.getByTestId('collect-bar').boundingBox();
+  const nav = await page.getByRole('navigation', { name: 'Quick' }).boundingBox();
+  expect(bar).not.toBeNull();
+  expect(bar!.y + bar!.height).toBeLessThanOrEqual(nav!.y + 1);
+  expect(bar!.y).toBeGreaterThan(0);
+  await page
+    .locator('[data-sonner-toaster]')
+    .evaluateAll((els) => els.forEach((e) => ((e as HTMLElement).style.display = 'none')));
+  await page.screenshot({ path: `${SHOTS}/375-collect-payment.png` }); // the phone screen as seen
 
   await page.goto(`/fees/students/${ids.aarav}`);
   await expect(page.getByTestId(`invoice-${ids.invoiceNo}`)).toBeVisible({ timeout: 30_000 });
