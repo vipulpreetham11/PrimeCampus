@@ -50,7 +50,7 @@ function DialogShell({
 }) {
   return (
     <Dialog open={open} onOpenChange={(o) => !locked && onOpenChange(o)}>
-      <DialogContent>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           {description && <DialogDescription>{description}</DialogDescription>}

@@ -139,7 +139,7 @@ function ResolveDialog({
   const [error, setError] = useState<unknown>(null);
   return (
     <Dialog open onOpenChange={(o) => !o && !mut.isPending && onClose()}>
-      <DialogContent>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Resolve this exception</DialogTitle>
           <DialogDescription>

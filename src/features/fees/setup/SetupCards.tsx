@@ -146,7 +146,7 @@ function HeadDialog({
   });
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{head ? `Edit ${head.name}` : 'New fee head'}</DialogTitle>
           <DialogDescription>
@@ -346,7 +346,7 @@ function AccountDialog({
   });
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{account ? `Edit ${account.label}` : 'New receiving account'}</DialogTitle>
           <DialogDescription>
@@ -503,7 +503,7 @@ function TermDialog({
   });
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{term ? `Edit ${term.name}` : 'New term'}</DialogTitle>
           <DialogDescription>
@@ -697,7 +697,7 @@ function PresetDialog({
   });
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{preset ? `Edit ${preset.name}` : 'New concession'}</DialogTitle>
           <DialogDescription>

@@ -76,7 +76,7 @@ export function ExceptionDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !frozen && onOpenChange(o)}>
-      <DialogContent>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Record a payment exception</DialogTitle>
           <DialogDescription>

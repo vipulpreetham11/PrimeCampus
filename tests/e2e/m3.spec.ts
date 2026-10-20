@@ -373,22 +373,24 @@ test('4. UPI payment with a reference; the same reference again → DUPLICATE na
 }) => {
   test.setTimeout(240_000);
   const { context, page } = await asAccountant(browser);
-  const pay = async () => {
+  const pay = async (amount: number) => {
     await openCollect(page, ids.aarav);
     await choose(page, 'Method', 'UPI');
     await choose(page, 'Received into', `${BANK} (Bank account)`);
     await page.getByLabel('Transaction reference (UTR)').fill(UTR);
-    await page.getByLabel('Amount received').fill(rs(A.upi));
-    await allocateOnly(page, ids.invoice!, rs(A.upi));
+    await page.getByLabel('Amount received').fill(rs(amount));
+    await allocateOnly(page, ids.invoice!, rs(amount));
     await page.getByTestId('save-payment').click();
   };
-  await pay();
+  await pay(A.upi);
   await expect(page).toHaveURL(/\/fees\/receipts\//, { timeout: 30_000 });
   receipts.upi = {
     id: page.url().split('/').pop()!,
     no: (await page.getByTestId('receipt-no').textContent())!.trim(),
   };
-  await pay();
+  // the same UTR on a different amount: the reference check (an identical re-entry would first meet the
+  // possible-duplicate question of 2330)
+  await pay(A.upi + 100);
   await expect(page.getByTestId('duplicate-receipt')).toContainText(
     `Already posted on receipt ${receipts.upi.no}`,
     {
