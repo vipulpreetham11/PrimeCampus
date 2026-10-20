@@ -196,6 +196,11 @@ test('5. A forced stale context revision shows the "role/school changed" message
   await expect(page.getByTestId('dashboard-operator')).toBeVisible();
   await page.screenshot({ path: `${SCREENS}/375-operator-shell.png`, fullPage: true });
 
+  // Since M4 the dashboard has its own school query, which would meet the stale revision before the
+  // probe does (and cancel it). Force it on a page without school queries: the operator console.
+  await page.goto('/operator/maintenance');
+  await expect(page.getByTestId('maintenance')).toBeVisible({ timeout: 30_000 });
+
   const before = await page.evaluate(() => window.__pcE2E!.revision());
   expect(before).not.toBeNull();
 
@@ -213,6 +218,7 @@ test('5. A forced stale context revision shows the "role/school changed" message
   // Recovered: the client adopted the server's revision and school RPCs succeed again.
   await expect.poll(() => page.evaluate(() => window.__pcE2E!.revision())).toBe(before);
   expect(await page.evaluate(() => window.__pcE2E!.probeSchoolRpc())).toBe('ok');
+  await page.goto('/dashboard');
   await expect(page.getByTestId('dashboard-operator')).toBeVisible();
   await context.close();
 });
