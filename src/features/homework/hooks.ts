@@ -24,6 +24,8 @@ function useInvalidateHomework() {
         'schedule',
         'student-homework',
         'diary-entry',
+        'academic-coverage',
+        'dashboard',
       ].map((f) => qc.invalidateQueries({ queryKey: key(f) })),
     );
 }
@@ -65,19 +67,31 @@ export interface HomeworkFilter {
   subjectId: string | null;
   staffId: string | null;
   status: 'active' | 'cancelled' | 'all';
+  /** 2410: from/to are DUE dates and only homework with no checks at all is listed (the dashboard rule). */
+  dueUnchecked?: boolean;
 }
 
 /** list_homework: ≤ 400 days, keyset (assigned_on, id) descending, 50 per page. */
 export function useHomeworkList(f: HomeworkFilter, enabled = true) {
   const key = useScopedKey();
   return useInfiniteQuery({
-    queryKey: key('homework-list', f.from, f.to, f.sectionId, f.subjectId, f.staffId, f.status),
+    queryKey: key(
+      'homework-list',
+      f.from,
+      f.to,
+      f.sectionId,
+      f.subjectId,
+      f.staffId,
+      f.status,
+      !!f.dueUnchecked,
+    ),
     queryFn: ({ signal, pageParam }) =>
       listHomework(
         {
           p_from: f.from,
           p_to: f.to,
           p_status: f.status,
+          ...(f.dueUnchecked ? { p_due_unchecked: true } : {}),
           ...(f.sectionId ? { p_section_id: f.sectionId } : {}),
           ...(f.subjectId ? { p_subject_id: f.subjectId } : {}),
           ...(f.staffId ? { p_staff_id: f.staffId } : {}),
@@ -151,7 +165,7 @@ export function useInvalidateHomeworkChecks() {
   const qc = useQueryClient();
   return () =>
     Promise.all(
-      ['homework-list', 'teacher-today', 'student-homework'].map((f) =>
+      ['homework-list', 'teacher-today', 'student-homework', 'academic-coverage', 'dashboard'].map((f) =>
         qc.invalidateQueries({ queryKey: key(f) }),
       ),
     );

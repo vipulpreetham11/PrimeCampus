@@ -1,4 +1,5 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
+import { recordHomeworkTraffic } from './helpers/homework';
 import { ApiSession, operatorSession, setKnownPassword } from './helpers/api';
 import {
   addDays,
@@ -267,6 +268,7 @@ test("M2-3. Parent (demo.parent) sees real data for Aarav on the period-wise day
     .first();
   await english.getByRole('link', { name: 'Diary & homework' }).click();
   await expect(t.page.getByTestId('lesson-page')).toBeVisible({ timeout: 30_000 });
+  const traffic = recordHomeworkTraffic(t.page, RUN);
   await t.page.getByLabel('What was covered').fill(note);
   await t.page.getByRole('button', { name: /^(Save diary|Save changes)$/ }).click();
   await expect(t.page.getByTestId('diary-meta')).toContainText('Lesson on', { timeout: 30_000 });
@@ -276,6 +278,8 @@ test("M2-3. Parent (demo.parent) sees real data for Aarav on the period-wise day
   await d.getByRole('button', { name: 'Set homework' }).click();
   await expect(d).toBeHidden({ timeout: 30_000 });
   const hw = t.page.getByTestId('lesson-homework').filter({ hasText: RUN });
+  // bounded (the unbounded click waited 6.7 min in M4 full run 3); evidence attached on failure
+  await traffic.expectListed(hw);
   await hw.getByRole('link', { name: 'Check homework' }).click();
   await expect(t.page.getByTestId('homework-roster')).toBeVisible({ timeout: 30_000 });
   const aarav = t.page.getByTestId('check-row').filter({ hasText: 'Aarav Sharma' });

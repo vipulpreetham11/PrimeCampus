@@ -9,6 +9,7 @@ import { dayTypeText, isWorkingDay } from '@/features/schedule/LessonCard';
 import { addDays, formatDateLong, isIsoDate, schoolToday } from '@/lib/dates';
 import { useCan } from '@/lib/scope';
 import { useAttendanceOverview } from './hooks';
+import { AttendanceTabs } from './register/AttendanceTabs';
 
 // Attendance overview for a date (brief §4, attendance.summary): per section, marks recorded vs
 // expected and the present count. "Not marked yet" is shown as such — never as absent or 0%.
@@ -27,6 +28,7 @@ export function AttendanceOverviewPage() {
 
   return (
     <div className="space-y-4">
+      <AttendanceTabs />
       <PageHeader title="Attendance" description="How much of each section's attendance is marked." />
       <div className="flex items-end gap-1">
         <Button

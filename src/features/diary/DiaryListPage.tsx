@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { DataState } from '@/components/shared/DataState';
 import { DateInput } from '@/components/shared/DateInput';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -13,7 +13,15 @@ import {
   useSectionOptions,
   useTeacherOptions,
 } from '@/features/timetable/pickers';
-import { addDays, daysBetween, formatDateTime, formatDayShort, formatTime, schoolToday } from '@/lib/dates';
+import {
+  addDays,
+  daysBetween,
+  formatDateTime,
+  formatDayShort,
+  formatTime,
+  isIsoDate,
+  schoolToday,
+} from '@/lib/dates';
 import { useCan } from '@/lib/scope';
 import { useDiaryList, type DiaryFilter } from './hooks';
 
@@ -24,13 +32,15 @@ import { useDiaryList, type DiaryFilter } from './hooks';
 export function DiaryListPage() {
   const readAll = useCan('academic.read_all');
   const today = schoolToday();
-  const [f, setF] = useState<DiaryFilter>({
-    from: addDays(today, -13),
-    to: today,
+  // The dashboard links here with ?from=&to=&missing=1 (its "diary missing" number).
+  const [params] = useSearchParams();
+  const [f, setF] = useState<DiaryFilter>(() => ({
+    from: isIsoDate(params.get('from')) ? (params.get('from') as string) : addDays(today, -13),
+    to: isIsoDate(params.get('to')) ? (params.get('to') as string) : today,
     sectionId: null,
     staffId: null,
-    onlyMissing: false,
-  });
+    onlyMissing: params.get('missing') === '1',
+  }));
   const { options: sections } = useSectionOptions();
   const { options: teachers } = useTeacherOptions();
   const span = f.from && f.to ? daysBetween(f.from, f.to) : -1;

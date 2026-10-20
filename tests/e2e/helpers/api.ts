@@ -108,6 +108,20 @@ export class ApiSession {
   }
 }
 
+/**
+ * End an app session from outside the page that holds it ("a second context"): calls
+ * end_app_session with that page's own access token. The token stays in memory, never printed.
+ */
+export async function endAppSessionWithToken(accessToken: string): Promise<boolean> {
+  const res = await fetch(`${URL_}/rest/v1/rpc/end_app_session`, {
+    method: 'POST',
+    headers: { apikey: KEY, authorization: `Bearer ${accessToken}`, 'content-type': 'application/json' },
+    body: '{}',
+  });
+  const body = (await res.json().catch(() => null)) as { ended?: boolean } | null;
+  return res.ok && body?.ended === true;
+}
+
 export function newPassword(): string {
   return `Pc-${crypto.randomUUID().replace(/-/g, '').slice(0, 14)}`;
 }

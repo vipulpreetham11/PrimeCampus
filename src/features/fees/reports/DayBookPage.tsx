@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { DataState } from '@/components/shared/DataState';
 import { DateInput } from '@/components/shared/DateInput';
 import { ErrorText } from '@/components/shared/ErrorText';
@@ -18,7 +18,7 @@ import {
   type PaymentMethod,
 } from '@/contracts/fees';
 import { downloadBlob } from '@/features/imports/template';
-import { formatDate, schoolToday } from '@/lib/dates';
+import { formatDate, isIsoDate, schoolToday } from '@/lib/dates';
 import { toAppError, type AppError } from '@/lib/errors';
 import { useCollectionReport, useDayBook, useFeeSetup, type DayBookFilter } from '../hooks';
 import { METHOD_LABELS } from '../labels';
@@ -34,14 +34,16 @@ const ALL = '__all';
 export function DayBookPage() {
   const today = schoolToday();
   const setup = useFeeSetup(null);
-  const [draft, setDraft] = useState<DayBookFilter>({
-    from: today,
-    to: today,
+  // The dashboard links here with ?from=&to= (its "collected on" number).
+  const [params] = useSearchParams();
+  const [draft, setDraft] = useState<DayBookFilter>(() => ({
+    from: isIsoDate(params.get('from')) ? (params.get('from') as string) : today,
+    to: isIsoDate(params.get('to')) ? (params.get('to') as string) : today,
     method: null,
     accountId: null,
     collectorId: null,
     search: '',
-  });
+  }));
   const [filter, setFilter] = useState<DayBookFilter>(draft);
   const query = useDayBook(filter);
   const [exporting, setExporting] = useState(false);

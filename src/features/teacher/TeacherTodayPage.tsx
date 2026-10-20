@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type { TeacherToday, TodayLesson } from '@/contracts/timetable';
+import { LessonSourceBadge } from '@/features/schedule/LessonCard';
 import { addDays, formatDateLong, formatDayMonth, formatTime, isIsoDate, schoolToday } from '@/lib/dates';
 import { getTeacherToday } from '@/lib/rpc';
 import { useScopedKey } from '@/lib/scope';
@@ -81,10 +82,10 @@ function TodayView({ t }: { t: TeacherToday }) {
           : 'Attendance per period: mark each lesson you take.'}
       </p>
 
-      {daily && t.class_teacher_sections.length > 0 && (
+      {t.class_teacher_sections.length > 0 && (
         <section aria-labelledby="ct-heading" className="space-y-2">
           <h2 id="ct-heading" className="text-base font-semibold">
-            My class — day register
+            {daily ? 'My class — day register' : 'My class'}
           </h2>
           <ul className="space-y-2">
             {t.class_teacher_sections.map((s) => (
@@ -95,11 +96,18 @@ function TodayView({ t }: { t: TeacherToday }) {
               >
                 <div className="min-w-0 flex-1">
                   <p className="font-medium">{s.section}</p>
-                  <MarkedText marked={s.daily_marked} eligible={s.eligible} />
+                  {daily && <MarkedText marked={s.daily_marked} eligible={s.eligible} />}
                 </div>
-                <Button asChild className="min-h-11">
-                  <Link to={`/attendance/daily/${s.section_id}/${t.date}`} state={{ section: s.section }}>
-                    <ClipboardCheck aria-hidden="true" /> Day attendance
+                {daily && (
+                  <Button asChild className="min-h-11">
+                    <Link to={`/attendance/daily/${s.section_id}/${t.date}`} state={{ section: s.section }}>
+                      <ClipboardCheck aria-hidden="true" /> Day attendance
+                    </Link>
+                  </Button>
+                )}
+                <Button asChild variant="outline" className="min-h-11">
+                  <Link to={`/attendance/register?section=${s.section_id}&month=${t.date.slice(0, 7)}`}>
+                    Month register
                   </Link>
                 </Button>
               </li>
@@ -180,6 +188,7 @@ function TodayLessonCard({ l, daily }: { l: TodayLesson; daily: boolean }) {
             {l.subject} · {l.section}
           </p>
         </div>
+        <LessonSourceBadge source={l.source} />
         {l.is_substitution && <Badge variant="secondary">Substitution</Badge>}
         {cancelled && <Badge variant="destructive">Cancelled</Badge>}
       </div>

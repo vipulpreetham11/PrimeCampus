@@ -73,6 +73,7 @@ import {
   startImportResultSchema,
 } from './imports';
 import {
+  extraLessonAddedSchema,
   lessonUpdatedSchema,
   lessonsGeneratedSchema,
   scheduleDaySchema,
@@ -145,6 +146,29 @@ import {
   studentConcessionPageSchema,
   termIssuedSchema,
 } from './fees';
+import {
+  paidLeaveCancelledSchema,
+  paidLeaveRecordedSchema,
+  paidLeaveSchema,
+  salaryComputationSchema,
+  salaryMonthSchema,
+  salarySavedSchema,
+  salaryVersionSchema,
+} from './salary';
+import {
+  academicCoverageSchema,
+  attendanceChangePageSchema,
+  attendanceRegisterSchema,
+  feeHeadReportSchema,
+} from './reports';
+import { dashboardSchema } from './dashboard';
+import {
+  auditPageSchema,
+  authPageSchema,
+  maintenanceSchema,
+  retentionCleanupSchema,
+  usageSchema,
+} from './operator';
 
 // Response schemas per RPC. The RPC layer validates a response when its function is listed
 // here; otherwise the generated `Json` type is returned. Feature modules add their DTOs here
@@ -237,6 +261,7 @@ export const RPC_RESULT_SCHEMAS = {
   get_date_schedule: z.array(scheduleLessonSchema),
   get_schedule_range: z.array(scheduleDaySchema),
   update_lesson_session: lessonUpdatedSchema,
+  add_extra_lesson: extraLessonAddedSchema,
   suggest_substitutes: z.array(substituteSuggestionSchema),
   assign_substitute: substituteAssignedSchema,
   remove_substitute: lessonUpdatedSchema,
@@ -306,6 +331,29 @@ export const RPC_RESULT_SCHEMAS = {
   get_collection_report: collectionReportSchema,
   get_dues_report: z.array(duesRowSchema),
   search_fee_students: z.array(feeStudentSchema),
+
+  // M4 — salary
+  get_salary_month: salaryMonthSchema,
+  preview_salary: salaryComputationSchema,
+  save_salary_calculation: salarySavedSchema,
+  get_salary_calculations: z.array(salaryVersionSchema),
+  list_paid_leave: z.array(paidLeaveSchema),
+  record_paid_leave: paidLeaveRecordedSchema,
+  cancel_paid_leave: paidLeaveCancelledSchema,
+
+  // M4 — reports and dashboards
+  get_attendance_register: attendanceRegisterSchema,
+  list_attendance_changes: attendanceChangePageSchema,
+  get_academic_coverage: academicCoverageSchema,
+  get_fee_head_report: feeHeadReportSchema,
+  get_dashboard: dashboardSchema,
+
+  // M4 — operator console
+  op_get_audit_events: auditPageSchema,
+  op_get_auth_events: authPageSchema,
+  op_get_usage: usageSchema,
+  op_get_maintenance: maintenanceSchema,
+  op_run_retention_cleanup: retentionCleanupSchema,
 } satisfies Record<string, z.ZodType>;
 
 export type RpcWithSchema = keyof typeof RPC_RESULT_SCHEMAS;

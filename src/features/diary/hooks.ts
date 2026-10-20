@@ -28,8 +28,8 @@ export function useSaveDiary() {
     onSettled: (_d, _e, v) =>
       Promise.all([
         qc.invalidateQueries({ queryKey: key('diary-entry', v.lessonId) }),
-        ...['diary-list', 'teacher-today', 'schedule', 'student-diary'].map((f) =>
-          qc.invalidateQueries({ queryKey: key(f) }),
+        ...['diary-list', 'teacher-today', 'schedule', 'student-diary', 'academic-coverage', 'dashboard'].map(
+          (f) => qc.invalidateQueries({ queryKey: key(f) }),
         ),
       ]),
   });

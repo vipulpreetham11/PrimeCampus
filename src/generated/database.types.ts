@@ -30,6 +30,20 @@ export type Database = {
         }
         Returns: Json
       }
+      add_extra_lesson: {
+        Args: {
+          p_ctx_rev: number
+          p_date: string
+          p_end_time: string
+          p_label?: string
+          p_reason?: string
+          p_section_id: string
+          p_staff_id?: string
+          p_start_time: string
+          p_subject_id: string
+        }
+        Returns: Json
+      }
       add_invoice_adjustment: {
         Args: {
           p_amount_paise: number
@@ -166,8 +180,21 @@ export type Database = {
         }
         Returns: Json
       }
+      get_academic_coverage: {
+        Args: {
+          p_ctx_rev: number
+          p_from: string
+          p_section_id?: string
+          p_to: string
+        }
+        Returns: Json
+      }
       get_attendance_overview: {
         Args: { p_ctx_rev: number; p_date: string }
+        Returns: Json
+      }
+      get_attendance_register: {
+        Args: { p_ctx_rev: number; p_month: string; p_section_id: string }
         Returns: Json
       }
       get_calendar: {
@@ -186,6 +213,10 @@ export type Database = {
         Returns: Json
       }
       get_context: { Args: never; Returns: Json }
+      get_dashboard: {
+        Args: { p_ctx_rev: number; p_date?: string }
+        Returns: Json
+      }
       get_date_schedule: {
         Args: {
           p_ctx_rev: number
@@ -208,6 +239,14 @@ export type Database = {
           p_only_overdue?: boolean
           p_only_with_balance?: boolean
           p_section_id?: string
+        }
+        Returns: Json
+      }
+      get_fee_head_report: {
+        Args: {
+          p_academic_year_id?: string
+          p_ctx_rev: number
+          p_fee_term_id?: string
         }
         Returns: Json
       }
@@ -261,6 +300,10 @@ export type Database = {
       }
       get_salary_calculations: {
         Args: { p_ctx_rev: number; p_month?: string; p_staff_id?: string }
+        Returns: Json
+      }
+      get_salary_month: {
+        Args: { p_ctx_rev: number; p_month: string; p_staff_group_id?: string }
         Returns: Json
       }
       get_schedule_range: {
@@ -395,6 +438,19 @@ export type Database = {
         }
         Returns: Json
       }
+      list_attendance_changes: {
+        Args: {
+          p_before_id?: number
+          p_ctx_rev: number
+          p_from: string
+          p_kind?: string
+          p_limit?: number
+          p_person_id?: string
+          p_section_id?: string
+          p_to: string
+        }
+        Returns: Json
+      }
       list_cheques: {
         Args: {
           p_before_date?: string
@@ -449,6 +505,7 @@ export type Database = {
           p_before_date?: string
           p_before_id?: string
           p_ctx_rev: number
+          p_due_unchecked?: boolean
           p_from: string
           p_limit?: number
           p_section_id?: string
@@ -480,6 +537,15 @@ export type Database = {
           p_ctx_rev: number
           p_fee_head_id: string
           p_section_id?: string
+        }
+        Returns: Json
+      }
+      list_paid_leave: {
+        Args: {
+          p_ctx_rev: number
+          p_from: string
+          p_staff_id?: string
+          p_to: string
         }
         Returns: Json
       }
@@ -622,6 +688,7 @@ export type Database = {
         }
         Returns: Json
       }
+      op_get_maintenance: { Args: never; Returns: Json }
       op_get_usage: {
         Args: { p_from: string; p_school_id?: string; p_to: string }
         Returns: Json
@@ -1175,9 +1242,11 @@ export type Database = {
         Args: {
           p_action: string
           p_ctx_rev: number
+          p_end_time?: string
           p_expected_version?: number
           p_lesson_session_id: number
           p_reason?: string
+          p_start_time?: string
           p_subject_id?: string
         }
         Returns: Json

@@ -50,9 +50,15 @@ export function useInvalidateLessons() {
   const qc = useQueryClient();
   return () =>
     Promise.all(
-      ['schedule', 'teacher-today', 'diary-list', 'attendance-overview'].map((f) =>
-        qc.invalidateQueries({ queryKey: key(f) }),
-      ),
+      [
+        'schedule',
+        'teacher-today',
+        'diary-list',
+        'attendance-overview',
+        'attendance-register',
+        'academic-coverage',
+        'dashboard',
+      ].map((f) => qc.invalidateQueries({ queryKey: key(f) })),
     );
 }
 

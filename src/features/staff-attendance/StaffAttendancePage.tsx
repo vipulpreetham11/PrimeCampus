@@ -160,7 +160,14 @@ function StaffRoster({ data, reload }: { data: StaffAttendance; reload: () => Pr
     [data.date],
   );
   const reloadAll = useCallback(
-    () => Promise.all([reload(), qc.invalidateQueries({ queryKey: key('schedule') })]),
+    () =>
+      Promise.all([
+        reload(),
+        // staff marks feed the schedule (absent teachers), salary, the dashboard and the change trail
+        ...['schedule', 'salary-month', 'salary-preview', 'dashboard', 'attendance-changes'].map((f) =>
+          qc.invalidateQueries({ queryKey: key(f) }),
+        ),
+      ]),
     [reload, qc, key],
   );
   const saver = useRosterSave<AttendanceStatus>({

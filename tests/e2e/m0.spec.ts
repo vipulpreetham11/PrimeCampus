@@ -128,7 +128,8 @@ test('2. demo.admin signs in with the temp password, is forced to change it, lan
   const summary = page.getByTestId('context-summary');
   await expect(summary).toContainText('Demo School');
   await expect(summary).toContainText('Admin');
-  await expect(page.getByText('Coming in module M4')).toBeVisible();
+  // M4 replaced the placeholder with the real dashboard
+  await expect(page.getByRole('heading', { name: 'Admin dashboard' })).toBeVisible();
   await expect(page.getByText('Password changed.')).toBeHidden({ timeout: 10_000 }); // toast clears
   await page.screenshot({ path: `${SCREENS}/375-admin-shell.png`, fullPage: true });
 
@@ -195,6 +196,11 @@ test('5. A forced stale context revision shows the "role/school changed" message
   await expect(page.getByTestId('dashboard-operator')).toBeVisible();
   await page.screenshot({ path: `${SCREENS}/375-operator-shell.png`, fullPage: true });
 
+  // Since M4 the dashboard has its own school query, which would meet the stale revision before the
+  // probe does (and cancel it). Force it on a page without school queries: the operator console.
+  await page.goto('/operator/maintenance');
+  await expect(page.getByTestId('maintenance')).toBeVisible({ timeout: 30_000 });
+
   const before = await page.evaluate(() => window.__pcE2E!.revision());
   expect(before).not.toBeNull();
 
@@ -212,6 +218,7 @@ test('5. A forced stale context revision shows the "role/school changed" message
   // Recovered: the client adopted the server's revision and school RPCs succeed again.
   await expect.poll(() => page.evaluate(() => window.__pcE2E!.revision())).toBe(before);
   expect(await page.evaluate(() => window.__pcE2E!.probeSchoolRpc())).toBe('ok');
+  await page.goto('/dashboard');
   await expect(page.getByTestId('dashboard-operator')).toBeVisible();
   await context.close();
 });

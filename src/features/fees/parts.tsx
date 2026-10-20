@@ -27,6 +27,7 @@ const TABS: { to: string; label: string; anyOf: Capability[] }[] = [
   { to: '/fees/concessions', label: 'Concessions', anyOf: ['fees.read'] },
   { to: '/fees/day-book', label: 'Day book', anyOf: ['fees.read'] },
   { to: '/fees/reports', label: 'Collection report', anyOf: ['fees.read'] },
+  { to: '/fees/reports/heads', label: 'Fee-head totals', anyOf: ['fees.read'] },
   { to: '/fees/dues', label: 'Dues', anyOf: ['fees.read'] },
   { to: '/fees/setup', label: 'Fee setup', anyOf: ['fees.read'] },
 ];
@@ -46,6 +47,7 @@ export function FeesLayout() {
               <li key={t.to}>
                 <NavLink
                   to={t.to}
+                  end
                   className={({ isActive }) =>
                     cn(
                       'inline-block rounded-md border px-3 py-1.5 text-sm whitespace-nowrap',

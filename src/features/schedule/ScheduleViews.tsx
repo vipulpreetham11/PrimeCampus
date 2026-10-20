@@ -4,7 +4,7 @@ import type { ScheduleDay, ScheduleLesson } from '@/contracts/timetable';
 import { formatDateLong, formatDayShort, schoolToday } from '@/lib/dates';
 import { cn } from '@/lib/utils';
 import { useDateSchedule, useScheduleRange, type ScheduleFilter } from './hooks';
-import { dayTypeText, isWorkingDay, LessonCard } from './LessonCard';
+import { dayTypeText, isUncovered, isWorkingDay, LessonCard } from './LessonCard';
 
 // Day and week views, shared by the staff schedule page and the parent/student area (the server
 // scopes a parent's request to the selected child's section).
@@ -14,6 +14,8 @@ interface ViewProps {
   showSection: boolean;
   lessonLink?: (l: ScheduleLesson) => string | undefined;
   actions?: (l: ScheduleLesson, date: string) => ReactNode;
+  /** "Not covered only": scheduled lessons whose teacher is marked absent (the dashboard's rule). */
+  onlyUncovered?: boolean;
 }
 
 function EmptyDay({ text }: { text: string }) {
@@ -26,6 +28,11 @@ function DayLessons({
   lessons,
   ...props
 }: ViewProps & { date: string; day: ScheduleDay['day'] | undefined; lessons: ScheduleLesson[] }) {
+  if (props.onlyUncovered) {
+    const uncovered = lessons.filter(isUncovered);
+    if (uncovered.length === 0) return <EmptyDay text="No lessons with an absent teacher on this day." />;
+    lessons = uncovered;
+  }
   if (lessons.length === 0) {
     const working = day === undefined || isWorkingDay(day);
     return (

@@ -71,9 +71,16 @@ export function useInvalidateAttendance() {
   const qc = useQueryClient();
   return () =>
     Promise.all(
-      ['teacher-today', 'attendance-overview', 'attendance-summary', 'attendance-records'].map((f) =>
-        qc.invalidateQueries({ queryKey: key(f) }),
-      ),
+      [
+        'teacher-today',
+        'attendance-overview',
+        'attendance-summary',
+        'attendance-records',
+        'attendance-register',
+        'attendance-changes',
+        'academic-coverage',
+        'dashboard',
+      ].map((f) => qc.invalidateQueries({ queryKey: key(f) })),
     );
 }
 

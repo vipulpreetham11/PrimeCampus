@@ -118,6 +118,34 @@ async function loadBootstrap(): Promise<void> {
   sessionStore.set({ status: 'choosing', context: null });
 }
 
+// The Operator RPCs check the app session inside `require_operator` and answer FORBIDDEN when it has
+// ended (sign-out elsewhere, or the daily clean-up after 30 idle days). FORBIDDEN alone can't tell
+// "session ended" from "Operator grant revoked", so ask bootstrap_account: UNAUTHENTICATED → sign in
+// again with the message; otherwise the refusal stands (the account flag is refreshed). One check
+// at a time.
+let sessionCheck: Promise<void> | null = null;
+export function verifySessionAfterForbidden(): Promise<void> {
+  if (sessionCheck) return sessionCheck;
+  sessionCheck = (async () => {
+    if (sessionStore.get().status === 'signed_out') return;
+    try {
+      const b = await bootstrapAccount(
+        { p_device_class: deviceClass(), p_user_agent: navigator.userAgent.slice(0, 400) },
+        { detached: true, silent: true },
+      );
+      const account = sessionStore.get().account;
+      if (account && account.isOperator !== b.is_operator)
+        sessionStore.set({ account: { ...account, isOperator: b.is_operator } });
+    } catch (e) {
+      if (isAppError(e) && e.code === 'UNAUTHENTICATED')
+        await localSignOut('Your session has ended. Please sign in again.');
+    }
+  })().finally(() => {
+    sessionCheck = null;
+  });
+  return sessionCheck;
+}
+
 // ---------------------------------------------------------------------------- public API
 let initialized = false;
 
@@ -130,6 +158,9 @@ export async function initSession(): Promise<void> {
     });
     setGlobalErrorHandler('STALE_CONTEXT', () => {
       void refreshContext('stale');
+    });
+    setGlobalErrorHandler('FORBIDDEN', (_e, source) => {
+      if (source?.startsWith('op_')) void verifySessionAfterForbidden();
     });
     if (typeof BroadcastChannel !== 'undefined') {
       channel = new BroadcastChannel(CHANNEL_NAME);
@@ -156,7 +187,15 @@ export async function initSession(): Promise<void> {
       showNotice('signed_out', 'Could not reach PrimeCampus. Check your connection and sign in again.');
       return;
     }
-    await localSignOut(err.code === 'FORBIDDEN' ? err.message : undefined);
+    // UNAUTHENTICATED here = the server ended this app session (sign-out elsewhere, reset, or idle for
+    // 30 days — the M4 daily clean-up): drop the Auth session too and ask for a fresh sign-in.
+    await localSignOut(
+      err.code === 'FORBIDDEN'
+        ? err.message
+        : err.code === 'UNAUTHENTICATED'
+          ? 'Your session has ended. Please sign in again.'
+          : undefined,
+    );
   }
 }
 

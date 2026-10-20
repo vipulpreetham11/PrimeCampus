@@ -21,7 +21,10 @@ export type NavIcon =
   | 'diary'
   | 'homework'
   | 'staff-attendance'
-  | 'fees';
+  | 'fees'
+  | 'salary'
+  | 'reports'
+  | 'logs';
 
 export interface LiveNavItem {
   kind: 'live';
@@ -69,6 +72,12 @@ const LIVE: LiveRule[] = [
   { label: 'Diary', to: '/diary', icon: 'diary', anyOf: ['academic.read_all', 'lessons.teach'] },
   { label: 'Timetable', to: '/timetable', icon: 'timetable', anyOf: ['timetable.read_all'] },
   {
+    label: 'Academic coverage',
+    to: '/reports/coverage',
+    icon: 'reports',
+    anyOf: ['academic.read_all'],
+  },
+  {
     label: 'Staff attendance',
     to: '/staff-attendance',
     icon: 'staff-attendance',
@@ -76,6 +85,8 @@ const LIVE: LiveRule[] = [
   },
   // fees (M3)
   { label: 'Fees', to: '/fees', icon: 'fees', anyOf: ['fees.read'] },
+  // salary (M4) — confidential
+  { label: 'Salary', to: '/salary', icon: 'salary', anyOf: ['staff_finance.read'] },
   // office (M1, M1b)
   { label: 'Students', to: '/students', icon: 'students', anyOf: ['students.read_all'] },
   { label: 'Admissions', to: '/admissions', icon: 'admissions', anyOf: ['admissions.manage'] },
@@ -92,10 +103,8 @@ const LIVE: LiveRule[] = [
   },
 ];
 
-const UPCOMING: UpcomingRule[] = [
-  { label: 'Salary', module: 'M4', anyOf: ['staff_finance.read'] },
-  { label: 'Activity logs', module: 'M4', anyOf: ['audit.read'] },
-];
+// Every V1 module is live since M4; the list stays for a later deliberate placeholder (PRD §15).
+const UPCOMING: UpcomingRule[] = [];
 
 /** The home destination's label: a teacher's home is "Today", a parent's or student's is "Home". */
 export function homeLabel(context: ActiveContext): { label: string; icon: NavIcon } {
@@ -116,8 +125,11 @@ export function buildNav(context: ActiveContext | null, isOperator: boolean): Na
       }
     }
   }
-  if (isOperator)
+  // Operator pages: the server checks the account's Operator grant (no school context needed).
+  if (isOperator) {
+    items.push({ kind: 'live', label: 'Operator console', to: '/operator/activity', icon: 'logs' });
     items.push({ kind: 'live', label: 'School onboarding', to: '/operator/onboarding', icon: 'operator' });
+  }
   if (!context) return items;
   for (const rule of UPCOMING) {
     const byCap = rule.anyOf?.some((c) => caps.has(c)) ?? false;
