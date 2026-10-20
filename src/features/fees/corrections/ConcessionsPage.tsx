@@ -6,8 +6,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import type { StudentConcession } from '@/contracts/fees';
-import type { StudentListItem } from '@/contracts/students';
+import type { FeeStudent, StudentConcession } from '@/contracts/fees';
 import { formatDateTime } from '@/lib/dates';
 import { formatBasisPoints } from '@/lib/money';
 import { useCan, useCurrentYearId } from '@/lib/scope';
@@ -23,7 +22,7 @@ export function ConcessionsPage() {
   const [yearId, setYearId] = useState<string | null>(currentYear);
   const [includeRevoked, setIncludeRevoked] = useState(false);
   const query = useStudentConcessions({ yearId, studentId: null, includeRevoked });
-  const [granting, setGranting] = useState<StudentListItem | null>(null);
+  const [granting, setGranting] = useState<FeeStudent | null>(null);
   const [revoking, setRevoking] = useState<StudentConcession | null>(null);
   const revoke = useRevokeConcession();
   const rows = query.data?.pages.flatMap((p) => p.items) ?? [];

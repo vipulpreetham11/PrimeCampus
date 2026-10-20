@@ -8,14 +8,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Capability } from '@/contracts/capabilities';
-import type { PaymentState } from '@/contracts/fees';
-import type { StudentListItem } from '@/contracts/students';
+import type { FeeStudent, PaymentState } from '@/contracts/fees';
 import { useSetupSnapshot } from '@/features/setup/hooks';
 import type { AppError } from '@/lib/errors';
-import { useCan, useCanAny } from '@/lib/scope';
+import { useCan } from '@/lib/scope';
 import { useSessionSelector } from '@/lib/session/store';
 import { cn } from '@/lib/utils';
-import { useStudentSearch } from './hooks';
+import { MoneyText } from '@/components/shared/MoneyText';
+import { useFeeStudentSearch } from './hooks';
 import { PAYMENT_STATE_LABELS } from './labels';
 
 // ------------------------------------------------------------------ layout
@@ -187,28 +187,20 @@ export function YearSelect({
 }
 
 // ------------------------------------------------------------------ student picker
-/** Find a student by name start or admission number (needs students.read_all). */
+/** Find a student by name or admission number (search_fee_students: every fees.read role). */
 export function StudentPicker({
   onPick,
   label = 'Find student',
   autoFocus,
 }: {
-  onPick: (s: StudentListItem) => void;
+  onPick: (s: FeeStudent) => void;
   label?: string;
   autoFocus?: boolean;
 }) {
-  const canSearch = useCanAny('students.read_all');
   const [text, setText] = useState('');
-  const query = useStudentSearch(text);
+  const query = useFeeStudentSearch(text);
   const inputId = useId();
-  if (!canSearch) {
-    return (
-      <p className="text-muted-foreground text-sm">
-        Your role can&apos;t search students. Open a student from the Dues report or the Day book.
-      </p>
-    );
-  }
-  const items = query.data?.items ?? [];
+  const items = query.data ?? [];
   return (
     <div className="space-y-2">
       <Label htmlFor={inputId}>{label}</Label>
@@ -247,11 +239,18 @@ export function StudentPicker({
                       setText('');
                     }}
                   >
-                    <span className="block font-medium">{s.name}</span>
-                    <span className="text-muted-foreground block text-xs break-all">
-                      {s.admission_no}
-                      {s.class ? ` · ${s.class} ${s.section ?? ''}` : ' · Class not set'}
-                      {s.status !== 'active' ? ` · ${s.status}` : ''}
+                    <span className="flex items-start justify-between gap-2">
+                      <span className="min-w-0">
+                        <span className="block font-medium">{s.name}</span>
+                        <span className="text-muted-foreground block text-xs break-all">
+                          {s.admission_no} · {s.class_section ?? 'Class not set'}
+                          {s.status !== 'active' ? ` · ${s.status}` : ''}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-right text-xs">
+                        <span className="text-muted-foreground block">Balance</span>
+                        <MoneyText paise={s.balance_paise} className="font-medium" />
+                      </span>
                     </span>
                   </button>
                 </li>

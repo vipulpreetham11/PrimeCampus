@@ -129,6 +129,7 @@ import {
   feeHeadSavedSchema,
   feeSetupSchema,
   feeStructureSavedSchema,
+  feeStudentSchema,
   feeTermSavedSchema,
   invoiceCancelledSchema,
   lateFeeRuleRetiredSchema,
@@ -304,6 +305,7 @@ export const RPC_RESULT_SCHEMAS = {
   list_collections: collectionPageSchema,
   get_collection_report: collectionReportSchema,
   get_dues_report: z.array(duesRowSchema),
+  search_fee_students: z.array(feeStudentSchema),
 } satisfies Record<string, z.ZodType>;
 
 export type RpcWithSchema = keyof typeof RPC_RESULT_SCHEMAS;

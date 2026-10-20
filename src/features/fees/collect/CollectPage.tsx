@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { PaymentMethod, ReceivingAccount, Statement } from '@/contracts/fees';
-import { formatDate, schoolToday } from '@/lib/dates';
+import { formatDate, formatDateTime, schoolToday } from '@/lib/dates';
 import { isAppError } from '@/lib/errors';
 import { formatPaise } from '@/lib/money';
 import {
@@ -37,6 +37,7 @@ import {
   openInvoices,
   totalCap,
   type Allocations,
+  type OpenInvoice,
 } from './allocation';
 import { ExceptionDialog } from './ExceptionDialog';
 
@@ -172,6 +173,12 @@ function CollectForm({ studentId, statement }: { studentId: string; statement: S
       if (r) setChequeDone({ replayed: r.replayed === true });
       return;
     }
+    await sendPayment(false);
+  };
+
+  /** post_collection; allow = the user confirmed a second payment like a recent one (2330). */
+  const sendPayment = async (allow: boolean) => {
+    if (amount === null) return;
     const r = await post.run(
       collectionPayload({
         studentId,
@@ -182,7 +189,8 @@ function CollectForm({ studentId, statement }: { studentId: string; statement: S
         reference: needsRef ? reference.trim() : null,
         payer: payer.trim() || null,
         notes: notes.trim() || null,
-        allocations,
+        allocations: allocationList(invoices, alloc),
+        allowPossibleDuplicate: allow,
       }),
     );
     if (r)
@@ -222,8 +230,14 @@ function CollectForm({ studentId, statement }: { studentId: string; statement: S
   }
 
   const failure = action.state.kind === 'failed' ? action.state.error : null;
+  const possibleDup = possibleDuplicateOf(failure);
+  // a reference already used on this account (UPI / bank) — not the possible-duplicate check
   const duplicateReceipt =
-    failure && failure.code === 'DUPLICATE' && typeof failure.details === 'object' && failure.details !== null
+    !possibleDup &&
+    failure &&
+    failure.code === 'DUPLICATE' &&
+    typeof failure.details === 'object' &&
+    failure.details !== null
       ? ((failure.details as { receipt_no?: unknown }).receipt_no as string | undefined)
       : undefined;
   const serverRow =
@@ -445,11 +459,7 @@ function CollectForm({ studentId, statement }: { studentId: string; statement: S
             />
           </fieldset>
 
-          <div aria-live="polite" className="space-y-2">
-            <p className="text-sm" data-testid="allocation-status">
-              Allocated <MoneyText paise={check.sum} /> of <MoneyText paise={amount} missing="—" />
-              {check.message ? ` · ${check.message}` : ' · adds up exactly'}
-            </p>
+          <div className="space-y-2">
             {check.extra > 0 && amount !== null && (
               <div
                 className="space-y-2 rounded-md border border-amber-600/50 p-3 text-sm"
@@ -483,7 +493,22 @@ function CollectForm({ studentId, statement }: { studentId: string; statement: S
             )}
           </div>
 
-          {failure && (
+          {possibleDup && amount !== null && (
+            <PossibleDuplicateNotice
+              dup={possibleDup}
+              amount={amount}
+              method={method}
+              studentName={statement.student.name}
+              receiptId={
+                statement.collections.find((c) => c.collection_id === possibleDup.collection_id)
+                  ?.receipt_id ?? null
+              }
+              studentId={studentId}
+              busy={frozen}
+              onConfirm={() => void sendPayment(true)}
+            />
+          )}
+          {failure && !possibleDup && (
             <div className="space-y-1">
               <ErrorText error={failure} />
               {duplicateReceipt && (
@@ -510,7 +535,15 @@ function CollectForm({ studentId, statement }: { studentId: string; statement: S
               </p>
             </UnconfirmedNotice>
           ) : (
-            <div className="flex flex-wrap items-center gap-3">
+            // always on screen on a phone, above the bottom navigation (same place as the roster save bar)
+            <div
+              className="bg-background/95 sticky bottom-16 z-20 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border p-3 shadow-sm backdrop-blur md:bottom-2"
+              data-testid="collect-bar"
+            >
+              <p className="min-w-0 flex-1 text-sm" data-testid="allocation-status" aria-live="polite">
+                Allocated <MoneyText paise={check.sum} /> of <MoneyText paise={amount} missing="—" />
+                {check.message ? ` · ${check.message}` : ' · adds up exactly'}
+              </p>
               <Button type="submit" disabled={!canSave} data-testid="save-payment">
                 {action.state.kind === 'saving'
                   ? 'Saving…'
@@ -519,7 +552,9 @@ function CollectForm({ studentId, statement }: { studentId: string; statement: S
                     : 'Save payment'}
               </Button>
               {!canSave && touched && !frozen && (
-                <span className="text-muted-foreground text-sm">Fix the highlighted items first.</span>
+                <span className="text-muted-foreground basis-full text-xs">
+                  Fix the highlighted items first.
+                </span>
               )}
             </div>
           )}
@@ -559,6 +594,7 @@ function AllocationTable({
   onChange: (invoiceId: string, paise: number, invalid: boolean) => void;
   onReset: () => void;
 }) {
+  const [showAll, setShowAll] = useState(false);
   if (invoices.length === 0) {
     return (
       <p className="bg-muted rounded-md p-3 text-sm" role="status">
@@ -577,7 +613,7 @@ function AllocationTable({
         )}
       </div>
       <ul className="divide-y rounded-md border" data-testid="allocation-rows">
-        {invoices.map((inv) => (
+        {visibleInvoices(invoices, alloc, rowErrors, showAll).map((inv) => (
           <li key={inv.invoice_id} className="grid gap-2 p-3 sm:grid-cols-[1fr_12rem] sm:items-center">
             <div className="min-w-0 text-sm">
               <span className="font-medium">{inv.label}</span>{' '}
@@ -610,6 +646,84 @@ function AllocationTable({
           </li>
         ))}
       </ul>
+      {!showAll && visibleInvoices(invoices, alloc, rowErrors, false).length < invoices.length && (
+        <Button type="button" size="sm" variant="outline" onClick={() => setShowAll(true)}>
+          Show all {invoices.length} invoices
+        </Button>
+      )}
+    </div>
+  );
+}
+
+/** The first 5 open invoices, plus any later one that has an amount or a problem (never hidden). */
+export function visibleInvoices(
+  invoices: OpenInvoice[],
+  alloc: Allocations,
+  rowErrors: Record<string, string>,
+  showAll: boolean,
+): OpenInvoice[] {
+  if (showAll) return invoices;
+  return invoices.filter(
+    (inv, i) => i < 5 || (alloc[inv.invoice_id] ?? 0) !== 0 || !!rowErrors[inv.invoice_id],
+  );
+}
+
+export interface PossibleDuplicate {
+  collection_id: string;
+  receipt_no: string;
+  recorded_at: string;
+}
+
+/**
+ * post_collection's "the same payment was recorded minutes ago" refusal (migration 2330): DUPLICATE with
+ * details.possible_duplicate. A reference already used (UPI / bank) is a DUPLICATE without the flag.
+ */
+export function possibleDuplicateOf(error: unknown): PossibleDuplicate | null {
+  if (!isAppError(error) || error.code !== 'DUPLICATE') return null;
+  const d = error.details as Partial<PossibleDuplicate & { possible_duplicate: boolean }> | null;
+  if (!d || d.possible_duplicate !== true || !d.collection_id || !d.receipt_no || !d.recorded_at) return null;
+  return { collection_id: d.collection_id, receipt_no: d.receipt_no, recorded_at: d.recorded_at };
+}
+
+function PossibleDuplicateNotice({
+  dup,
+  amount,
+  method,
+  studentName,
+  receiptId,
+  studentId,
+  busy,
+  onConfirm,
+}: {
+  dup: PossibleDuplicate;
+  amount: number;
+  method: PaymentMethod;
+  studentName: string;
+  receiptId: string | null;
+  studentId: string;
+  busy: boolean;
+  onConfirm: () => void;
+}) {
+  return (
+    <div
+      role="alert"
+      className="space-y-2 rounded-md border border-amber-600/60 bg-amber-50 p-3 text-sm dark:bg-amber-950/30"
+      data-testid="possible-duplicate"
+    >
+      <p>
+        {formatPaise(amount)} by {METHOD_LABELS[method].toLowerCase()} for {studentName} was already recorded
+        at {formatDateTime(dup.recorded_at)} (receipt {dup.receipt_no}). Is this a second, separate payment?
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Button asChild size="sm" variant="outline">
+          <Link to={receiptId ? `/fees/receipts/${receiptId}` : `/fees/students/${studentId}`}>
+            Open that receipt
+          </Link>
+        </Button>
+        <Button type="button" size="sm" onClick={onConfirm} disabled={busy}>
+          Yes, record another payment
+        </Button>
+      </div>
     </div>
   );
 }

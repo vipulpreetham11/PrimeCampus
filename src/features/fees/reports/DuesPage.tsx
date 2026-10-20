@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { DataState } from '@/components/shared/DataState';
 import { MoneyText } from '@/components/shared/MoneyText';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -13,7 +13,7 @@ import { downloadBlob } from '@/features/imports/template';
 import { useSetupSnapshot } from '@/features/setup/hooks';
 import { useCurrentYearId } from '@/lib/scope';
 import { useDues, useFeeSetup, type DuesFilter } from '../hooks';
-import { YearSelect } from '../parts';
+import { StudentPicker, YearSelect } from '../parts';
 import { duesCsv, duesTotals } from './csv';
 
 // Dues (brief §8): one row per student with any invoice in the year, students without a class too
@@ -23,6 +23,7 @@ const ALL = '__all';
 
 export function DuesPage() {
   const currentYear = useCurrentYearId();
+  const navigate = useNavigate();
   const [filter, setFilter] = useState<Omit<DuesFilter, 'yearId'> & { yearId: string | null }>({
     yearId: currentYear,
     classId: null,
@@ -57,6 +58,14 @@ export function DuesPage() {
           </Button>
         }
       />
+      <Card>
+        <CardContent className="pt-6">
+          <StudentPicker
+            label="Find a student's statement"
+            onPick={(s) => void navigate(`/fees/students/${s.student_id}`)}
+          />
+        </CardContent>
+      </Card>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <YearSelect
           value={filter.yearId}

@@ -147,6 +147,19 @@ export const optionalFeesSavedSchema = z.object({
 export type OptionalFeesSaved = z.infer<typeof optionalFeesSavedSchema>;
 
 // ---------------------------------------------------------------------------
+// Finding a student for fee work (search_fee_students, migration 2330: every fees.read role)
+
+export const feeStudentSchema = z.object({
+  student_id: id,
+  name: z.string(),
+  admission_no: z.string(),
+  status: z.string(),
+  class_section: z.string().nullable(),
+  balance_paise: paise,
+});
+export type FeeStudent = z.infer<typeof feeStudentSchema>;
+
+// ---------------------------------------------------------------------------
 // Concessions for students
 
 export const studentConcessionSchema = z.object({
@@ -539,8 +552,11 @@ export const collectionReportSchema = z.object({
   by_day_method: z.array(
     z.object({ date: isoDate, method: z.enum(PAYMENT_METHODS), count, amount_paise: paise }),
   ),
-  by_collector: z.array(z.object({ collector: z.string().nullable(), amount_paise: paise })),
-  by_account: z.array(z.object({ account: z.string(), amount_paise: paise })),
+  // migration 2330: ids for the day book's filters
+  by_collector: z.array(z.object({ collector: z.string().nullable(), collected_by: id, amount_paise: paise })),
+  by_account: z.array(
+    z.object({ account: z.string(), receiving_account_id: id.nullable(), amount_paise: paise }),
+  ),
   gross_posted_paise: paise,
   reversed_paise: paise,
   pending_cheques: z.object({ count, amount_paise: paise }),

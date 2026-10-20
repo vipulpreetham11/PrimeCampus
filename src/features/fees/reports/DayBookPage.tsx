@@ -20,7 +20,7 @@ import {
 import { downloadBlob } from '@/features/imports/template';
 import { formatDate, schoolToday } from '@/lib/dates';
 import { toAppError, type AppError } from '@/lib/errors';
-import { useDayBook, useFeeSetup, type DayBookFilter } from '../hooks';
+import { useCollectionReport, useDayBook, useFeeSetup, type DayBookFilter } from '../hooks';
 import { METHOD_LABELS } from '../labels';
 import { Figure } from '../parts';
 import { dayBookCsv } from './csv';
@@ -49,10 +49,11 @@ export function DayBookPage() {
   const rows: CollectionRow[] = query.data?.pages.flatMap((p) => p.items) ?? [];
   const rangeOk = draft.from !== '' && draft.to !== '' && draft.from <= draft.to;
 
-  // collectors seen in the rows loaded (the RPC has no list of collectors); the chosen one stays listed
-  const collectors = new Map<string, string>();
-  for (const r of rows)
-    if (!collectors.has(r.collected_by)) collectors.set(r.collected_by, r.collector ?? 'Unknown');
+  // everyone who collected money in the shown date range (get_collection_report.by_collector, 2330)
+  const report = useCollectionReport(filter.from, filter.to);
+  const collectors = new Map<string, string>(
+    (report.data?.by_collector ?? []).map((c) => [c.collected_by, c.collector ?? 'Unknown']),
+  );
   if (draft.collectorId && !collectors.has(draft.collectorId))
     collectors.set(draft.collectorId, 'Chosen collector');
 

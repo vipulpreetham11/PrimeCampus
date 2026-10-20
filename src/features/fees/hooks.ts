@@ -21,7 +21,6 @@ import {
   listOptionalFeeRoster,
   listPaymentExceptions,
   listStudentConcessions,
-  listStudents,
   postCollection,
   previewTermInvoices,
   recordCheque,
@@ -36,6 +35,7 @@ import {
   saveFeeTerm,
   saveLateFeeRule,
   saveReceivingAccount,
+  searchFeeStudents,
   setOptionalFees,
   waiveLateFee,
 } from '@/lib/rpc';
@@ -251,13 +251,16 @@ export function useSetOptionalFees() {
 }
 
 // ------------------------------------------------------------------ students
-/** Student finder (list_students: students.read_all). Name start or exact admission number. */
-export function useStudentSearch(search: string) {
+/**
+ * Student finder for fee work (search_fee_students, migration 2330): any fees.read role, the Owner too.
+ * Name or admission number start; each match carries the class and the balance.
+ */
+export function useFeeStudentSearch(search: string) {
   const key = useScopedKey();
   const q = search.trim();
   return useQuery({
     queryKey: key('fee-student-search', q),
-    queryFn: ({ signal }) => listStudents({ p_search: q, p_limit: 20 }, { signal }),
+    queryFn: ({ signal }) => searchFeeStudents({ p_q: q, p_limit: 20 }, { signal }),
     enabled: q.length >= 2,
     staleTime: 30_000,
   });
@@ -465,6 +468,8 @@ export interface CollectionInput {
   payer: string | null;
   notes: string | null;
   allocations: AllocationInput[];
+  /** The user confirmed a second payment like one recorded minutes ago (migration 2330). */
+  allowPossibleDuplicate?: boolean;
 }
 /** post_collection arguments without the operation id (the payload the tracker compares). */
 export function collectionPayload(v: CollectionInput) {
@@ -478,6 +483,7 @@ export function collectionPayload(v: CollectionInput) {
     ...(v.reference ? { p_external_ref: v.reference } : {}),
     ...(v.payer ? { p_payer_name: v.payer } : {}),
     ...(v.notes ? { p_notes: v.notes } : {}),
+    ...(v.allowPossibleDuplicate ? { p_allow_possible_duplicate: true } : {}),
   };
 }
 export type CollectionPayload = ReturnType<typeof collectionPayload>;

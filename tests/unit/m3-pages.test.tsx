@@ -198,11 +198,120 @@ describe('collect payment', () => {
     expect(await screen.findByTestId('duplicate-receipt')).toHaveTextContent(
       'Already posted on receipt RCT/2026-27/00003',
     );
+    // a reference DUPLICATE is not the "possible duplicate" question
+    expect(screen.queryByTestId('possible-duplicate')).toBeNull();
     await user.click(screen.getByTestId('save-payment'));
     await waitFor(() => expect(calls('post_collection')).toHaveLength(2));
     expect(calls('post_collection')[1]!.args!.p_operation_id).not.toBe(
       calls('post_collection')[0]!.args!.p_operation_id,
     );
+  });
+
+  it('a possible duplicate (same student, method, amount, date within 30 min) asks; "Yes" re-sends with the flag and a new id', async () => {
+    const user = userEvent.setup();
+    let n = 0;
+    open((fn) => {
+      if (fn === 'get_student_statement')
+        return { data: statementRow({ collections: [collectionRowStmt()] }) };
+      if (fn !== 'post_collection') return null;
+      n += 1;
+      return n === 1
+        ? hinted(
+            'DUPLICATE',
+            'The same payment for this student was recorded a few minutes ago (receipt RCT/2026-27/00007).',
+            JSON.stringify({
+              possible_duplicate: true,
+              collection_id: M3.col1,
+              receipt_no: 'RCT/2026-27/00007',
+              recorded_at: '2026-10-19T05:30:00Z',
+            }),
+          )
+        : { data: posted };
+    });
+    await typeAmount(user, '5000');
+    await user.click(screen.getByTestId('save-payment'));
+    const notice = await screen.findByTestId('possible-duplicate');
+    expect(notice).toHaveTextContent(
+      /₹5,000\.00 by cash for Aarav Sharma was already recorded at .+ \(receipt RCT\/2026-27\/00007\)\. Is this a second, separate payment\?/,
+    );
+    expect(screen.queryByTestId('duplicate-receipt')).toBeNull();
+    expect(within(notice).getByRole('link', { name: 'Open that receipt' })).toHaveAttribute(
+      'href',
+      `/fees/receipts/${M3.rcpt1}`,
+    );
+    await user.click(within(notice).getByRole('button', { name: 'Yes, record another payment' }));
+    await waitFor(() => expect(calls('post_collection')).toHaveLength(2));
+    const [first, second] = calls('post_collection');
+    expect(first!.args).not.toHaveProperty('p_allow_possible_duplicate');
+    expect(second!.args).toMatchObject({ p_allow_possible_duplicate: true, p_amount_paise: 500000 });
+    expect(second!.args!.p_operation_id).not.toBe(first!.args!.p_operation_id);
+  });
+
+  it('shows the first 5 open invoices and "Show all N"; a later invoice with an amount stays visible', async () => {
+    const user = userEvent.setup();
+    const inv = (i: number) =>
+      invoiceRow({
+        invoice_id: `f2f2f2f2-0000-4000-8000-00000000010${i}`,
+        invoice_no: `INV/2026-27/0010${i}`,
+        due_date: `2026-07-0${i}`,
+        term: `Term ${i}`,
+        balance_paise: 10000,
+      });
+    open((fn) =>
+      fn === 'get_student_statement'
+        ? { data: statementRow({ invoices: [1, 2, 3, 4, 5, 6, 7].map(inv), total_due_paise: 70000 }) }
+        : null,
+    );
+    await typeAmount(user, '700');
+    // all 7 have an amount (oldest first fills every one) → none hidden
+    expect(within(screen.getByTestId('allocation-rows')).getAllByRole('textbox')).toHaveLength(7);
+    await typeAmount(user, '100');
+    expect(within(screen.getByTestId('allocation-rows')).getAllByRole('textbox')).toHaveLength(5);
+    await user.click(screen.getByRole('button', { name: 'Show all 7 invoices' }));
+    expect(within(screen.getByTestId('allocation-rows')).getAllByRole('textbox')).toHaveLength(7);
+    // the sticky bar carries the status and Save
+    const bar = screen.getByTestId('collect-bar');
+    expect(within(bar).getByTestId('allocation-status')).toHaveTextContent('adds up exactly');
+    expect(within(bar).getByTestId('save-payment')).toBeEnabled();
+  });
+
+  it('the student finder uses search_fee_students and shows class and balance', async () => {
+    const user = userEvent.setup();
+    onRpc((fn) => {
+      if (fn === 'search_fee_students')
+        return {
+          data: [
+            {
+              student_id: M3.student,
+              name: 'Aarav Sharma',
+              admission_no: 'DEMO-S1',
+              status: 'active',
+              class_section: 'Class 1 A',
+              balance_paise: 260000,
+            },
+            {
+              student_id: M3.other,
+              name: 'Aarav Rao',
+              admission_no: 'DEMO-S9',
+              status: 'active',
+              class_section: null,
+              balance_paise: 0,
+            },
+          ],
+        };
+      if (fn === 'get_student_statement') return { data: statementRow() };
+      return baseReads(fn) ?? { data: null };
+    });
+    const { router } = renderAt('/fees/collect', [{ path: '/fees/collect', element: <CollectPage /> }]);
+    await user.type(screen.getByLabelText('Find student'), 'aar');
+    const results = await screen.findByTestId('student-results');
+    expect(results).toHaveTextContent('DEMO-S1 · Class 1 A');
+    expect(results).toHaveTextContent('₹2,600.00');
+    expect(results).toHaveTextContent('DEMO-S9 · Class not set');
+    expect(calls('search_fee_students').at(-1)!.args).toMatchObject({ p_q: 'aar' });
+    expect(calls('list_students')).toHaveLength(0);
+    await user.click(within(results).getByRole('button', { name: /Aarav Sharma/ }));
+    await waitFor(() => expect(router.state.location.search).toBe(`?student=${M3.student}`));
   });
 
   it('more than the dues is blocked and offers a payment exception for the extra', async () => {
@@ -356,6 +465,33 @@ describe('dues report', () => {
     expect(totals).toHaveTextContent('₹4,500.00'); // balance 3500 + 1000
     expect(screen.getByTestId('dues-2024/002')).toHaveTextContent('Class not set');
     expect(calls('get_dues_report')[0]!.args).toMatchObject({ p_academic_year_id: ids.year });
+  });
+
+  it('the Owner (fees.read, no students.read_all) finds a student from Dues and opens the statement', async () => {
+    setCtx(FEE_CAPS.owner, 'owner');
+    const user = userEvent.setup();
+    onRpc((fn) => {
+      if (fn === 'get_dues_report') return { data: [] };
+      if (fn === 'search_fee_students')
+        return {
+          data: [
+            {
+              student_id: M3.student,
+              name: 'Aarav Sharma',
+              admission_no: 'DEMO-S1',
+              status: 'active',
+              class_section: 'Class 1 A',
+              balance_paise: 0,
+            },
+          ],
+        };
+      return baseReads(fn) ?? { data: null };
+    });
+    const { router } = renderAt('/fees/dues', [{ path: '/fees/dues', element: <DuesPage /> }]);
+    expect(screen.queryByText(/can.t search students/)).toBeNull();
+    await user.type(screen.getByLabelText("Find a student's statement"), 'DEMO-S1');
+    await user.click(await screen.findByRole('button', { name: /Aarav Sharma/ }));
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/fees/students/${M3.student}`));
   });
 });
 
